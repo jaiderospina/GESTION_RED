@@ -1,8 +1,8 @@
-# CentOS Stream 10 + Zabbix 7.4
+# CentOS  + Zabbix 7.4
 
 ## Monitoreo autorizado y alertas por correo
 
-Este documento explica cómo instalar **CentOS Stream 10** en una máquina virtual, desplegar **Zabbix 7.4** con MariaDB/MySQL y Apache, conectar un equipo físico mediante el agente Zabbix y enviar alertas por correo electrónico.
+Este documento explica cómo instalar **CentOS ** en una máquina virtual, desplegar **Zabbix 7.4** con MariaDB/MySQL y Apache, conectar un equipo físico mediante el agente Zabbix y enviar alertas por correo electrónico.
 
 > **Alcance responsable.** Zabbix debe utilizarse para supervisar infraestructura, servicios, disponibilidad, rendimiento y eventos técnicos en equipos autorizados. Este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta. El monitoreo debe realizarse con autorización, transparencia, finalidad definida y la mínima cantidad de datos necesaria.
 
