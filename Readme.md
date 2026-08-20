@@ -36,7 +36,6 @@ Para esta práctica se recomienda un **adaptador puente** en VirtualBox: la VM r
 | Frontend | Apache + PHP |
 | Buzón | Cuenta técnica autorizada para alertas |
 
-CentOS publica las imágenes de Stream 10 y recomienda verificar la ISO mediante SHA-256 antes de instalarla [2]. Descarga la ISO desde un espejo oficial y comprueba su suma:
 
 ```bash
 sha256sum CentOS-Stream-10-*.iso
@@ -50,9 +49,9 @@ Get-FileHash .\CentOS-Stream-10-*.iso -Algorithm SHA256
 
 ## 1. Crear la máquina virtual
 
-En VirtualBox selecciona **Nueva**, asigna 2 vCPU, 4 GiB de RAM y un disco dinámico de 30–40 GiB. En **Configuración → Red → Adaptador 1**, activa **Adaptador puente** y selecciona la interfaz de red conectada a la LAN autorizada.
+En VMware selecciona **Nueva**, asigna 2 vCPU, 4 GiB de RAM y un disco dinámico de 30–40 GiB. En **Configuración → Red → Adaptador 1**, activa **Adaptador puente** y selecciona la interfaz de red conectada a la LAN autorizada.
 
-Inicia la ISO, selecciona **Install CentOS Stream 10**, configura el disco virtual, la zona horaria, una cuenta administrativa y un nombre como `zabbix-server`. Después del primer inicio:
+Inicia la ISO, selecciona **Install CentOS**, configura el disco virtual, la zona horaria, una cuenta administrativa y un nombre como `zabbix-server`. Después del primer inicio:
 
 ```bash
 sudo dnf update -y
