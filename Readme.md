@@ -1,4 +1,4 @@
-# CentOS Stream 10 + Zabbix 7.4
+# CentOS + Zabbix 7.4
 
 ## Monitoreo autorizado y alertas por correo
 
