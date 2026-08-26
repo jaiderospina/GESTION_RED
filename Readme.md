@@ -370,30 +370,7 @@ El monitoreo debe limitarse a métricas técnicas necesarias para el objetivo de
 
 Antes de publicar o compartir este repositorio, revisa que no contenga contraseñas de MariaDB, contraseñas de aplicación SMTP, tokens, claves TLS/PSK, archivos `.env`, logs ni direcciones privadas. Si una credencial del material original fue utilizada, revócala y genera una nueva.
 
-## Reutilizar la carpeta de imágenes en otro repositorio
 
-Para copiar las imágenes a otro proyecto local, coloca ambos repositorios en el mismo directorio y ejecuta:
-
-```bash
-cp -R Aplicaciones_Moviles/docs/assets \
-  OTRO_REPOSITORIO/docs/assets
-cd OTRO_REPOSITORIO
-git add docs/assets
-git commit -m "docs: añadir capturas de apoyo"
-git push origin main
-```
-
-Si el otro repositorio está vacío, también puedes copiar la carpeta completa y publicar desde allí:
-
-```bash
-cp -R /ruta/Aplicaciones_Moviles/docs/assets /ruta/OTRO_REPOSITORIO/docs/
-cd /ruta/OTRO_REPOSITORIO
-git add docs/assets
-git commit -m "docs: añadir capturas de apoyo"
-git push origin main
-```
-
-En GitHub, la alternativa visual es abrir el repositorio destino, entrar en `docs/assets/`, seleccionar **Add file → Upload files**, elegir `image1.png` hasta `image15.png` y confirmar el commit. En el README del repositorio destino utiliza rutas relativas como `docs/assets/image1.png`.
 
 ## Referencias
 
