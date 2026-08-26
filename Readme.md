@@ -1,41 +1,65 @@
-# CentOS  + Zabbix 7.4
+# CentOS Stream 10 + Zabbix 7.4
 
-## Monitoreo autorizado y alertas por correo
+[![CentOS Stream 10](https://img.shields.io/badge/OS-CentOS%20Stream%2010-262577?logo=centos&logoColor=white)](https://www.centos.org/stream/)
+[![Zabbix 7.4](https://img.shields.io/badge/Zabbix-7.4-d40000?logo=zabbix&logoColor=white)](https://www.zabbix.com/)
+[![VirtualBox](https://img.shields.io/badge/VirtualBox-red?logo=virtualbox&logoColor=white)](https://www.virtualbox.org/)
+[![Monitoreo autorizado](https://img.shields.io/badge/monitoreo-autorizado-1f6feb)](#alcance-y-privacidad)
 
-Este documento explica cómo instalar **CentOS ** en una máquina virtual, desplegar **Zabbix 7.4** con MariaDB/MySQL y Apache, conectar un equipo físico mediante el agente Zabbix y enviar alertas por correo electrónico.
+## Laboratorio de instalación, monitoreo y alertas
 
-> **Alcance responsable.** Zabbix debe utilizarse para supervisar infraestructura, servicios, disponibilidad, rendimiento y eventos técnicos en equipos autorizados. Este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta. El monitoreo debe realizarse con autorización, transparencia, finalidad definida y la mínima cantidad de datos necesaria.
+Este proyecto presenta una ruta reproducible para instalar **CentOS Stream 10** en una máquina virtual, desplegar **Zabbix 7.4** con MariaDB/MySQL y Apache, conectar un equipo físico mediante el agente Zabbix y enviar alertas técnicas por correo electrónico.
 
-## Arquitectura de referencia
+> **Objetivo del laboratorio:** observar la disponibilidad, el rendimiento y los eventos técnicos de equipos autorizados, y notificar los problemas relevantes a un buzón operativo.
+
+> **Importante:** Zabbix debe utilizarse con autorización, transparencia y una finalidad definida. Este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta.
+
+## Recorrido rápido
+
+| Fase | Resultado |
+|---|---|
+| 01 · Preparar | VM con CentOS Stream 10 y red accesible |
+| 02 · Instalar | Zabbix Server, base de datos y frontend web |
+| 03 · Conectar | Equipo físico registrado mediante el agente |
+| 04 · Alertar | Medio Email, acción y prueba controlada |
+| 05 · Operar | Monitoreo técnico, seguro y documentado |
+
+El procedimiento se apoya visualmente en las capturas originales del documento `CapGestion.docx`. Las imágenes que contenían credenciales o datos personales fueron redactadas antes de publicarse en [`docs/assets/`](docs/assets/).
+
+## Arquitectura
 
 ```text
-Equipo físico autorizado                 Máquina virtual CentOS Stream 10
-+-------------------------+              +-------------------------------+
-| Zabbix agent            | -- LAN ----> | Zabbix Server 7.4             |
-| CPU, RAM, disco,        |              | MariaDB/MySQL + Apache        |
-| servicios y procesos    |              | Panel web: /zabbix            |
-+-------------------------+              +---------------+---------------+
-                                                         |
-                                                         | SMTP seguro
-                                                         v
-                                                  Buzón de alertas
+┌──────────────────────────┐       LAN       ┌────────────────────────────────┐
+│ Equipo físico autorizado │ ──────────────> │ VM CentOS Stream 10            │
+│                          │                │ Zabbix Server 7.4              │
+│ Zabbix Agent             │                │ MariaDB/MySQL + Apache          │
+│ CPU · RAM · disco        │                │ Panel web: /zabbix              │
+│ servicios autorizados    │                └───────────────┬────────────────┘
+└──────────────────────────┘                                │
+                                                            │ SMTP seguro
+                                                            v
+                                                   ┌────────────────────┐
+                                                   │ Buzón de alertas   │
+                                                   └────────────────────┘
 ```
 
-Para esta práctica se recomienda un **adaptador puente** en VirtualBox: la VM recibe una dirección propia en la red autorizada y puede comunicarse directamente con el equipo físico. VirtualBox documenta que NAT es adecuado para salida de la VM, pero que la máquina queda aislada e inaccesible desde el exterior salvo que se configure redirección de puertos [1].
+Para este laboratorio se recomienda configurar la VM con **adaptador puente**. Así, la máquina virtual obtiene una dirección propia en la red autorizada y puede comunicarse directamente con el equipo físico. VirtualBox documenta que NAT permite la salida de la VM, pero mantiene la máquina aislada de conexiones entrantes salvo que se configure redirección de puertos [1].
 
 ## Requisitos sugeridos
 
 | Componente | Valor de laboratorio |
 |---|---:|
 | CPU de la VM | 2 vCPU |
-| RAM | 4 GiB |
-| Disco | 30–40 GiB |
+| Memoria | 4 GiB |
+| Disco | 30–40 GiB dinámicos |
 | Sistema | CentOS Stream 10 x86_64 |
-| Red | Adaptador puente o red de laboratorio equivalente |
+| Red | Adaptador puente o segmento de laboratorio |
 | Base de datos | MariaDB/MySQL |
 | Frontend | Apache + PHP |
-| Buzón | Cuenta técnica autorizada para alertas |
+| Correo | Cuenta técnica autorizada |
 
+## 1. Preparar e instalar la máquina virtual
+
+Descarga la ISO de CentOS Stream 10 desde una fuente oficial y verifica su integridad antes de utilizarla [2]. En Linux:
 
 ```bash
 sha256sum CentOS-Stream-10-*.iso
@@ -47,11 +71,13 @@ En Windows PowerShell:
 Get-FileHash .\CentOS-Stream-10-*.iso -Algorithm SHA256
 ```
 
-## 1. Crear la máquina virtual
+En VirtualBox selecciona **Nueva**, asigna 2 vCPU, 4 GiB de RAM y un disco dinámico de 30–40 GiB. En **Configuración → Red → Adaptador 1**, activa **Adaptador puente** y selecciona la interfaz conectada a la LAN autorizada.
 
-En VMware selecciona **Nueva**, asigna 2 vCPU, 4 GiB de RAM y un disco dinámico de 30–40 GiB. En **Configuración → Red → Adaptador 1**, activa **Adaptador puente** y selecciona la interfaz de red conectada a la LAN autorizada.
+Inicia la ISO, selecciona **Install CentOS Stream 10**, configura el disco, la zona horaria y una cuenta administrativa. Utiliza un nombre como `zabbix-server`. La secuencia visual de preparación e instalación se resume en la siguiente captura del material de apoyo:
 
-Inicia la ISO, selecciona **Install CentOS**, configura el disco virtual, la zona horaria, una cuenta administrativa y un nombre como `zabbix-server`. Después del primer inicio:
+![Preparación inicial de CentOS y del entorno de instalación](docs/assets/image1.png)
+
+Después del primer inicio, actualiza el sistema, establece el nombre de host y registra la dirección de red:
 
 ```bash
 sudo dnf update -y
@@ -62,11 +88,13 @@ ip route
 cat /etc/centos-release
 ```
 
-Anota la IP de la VM como `ZABBIX_SERVER_IP`. Usa una IP reservada por el administrador de red o una concesión DHCP estable.
+Anota la IP de la VM como `ZABBIX_SERVER_IP`. Utiliza una IP reservada por el administrador de red o una concesión DHCP estable.
 
-## 2. Instalar MariaDB, Apache, PHP y Zabbix
+## 2. Instalar Zabbix Server
 
-La receta oficial de Zabbix 7.4 para CentOS 10, MySQL y Apache utiliza el repositorio oficial y los paquetes siguientes [3] [4]:
+### 2.1 Paquetes base y repositorio
+
+Instala MariaDB, Apache, PHP y las extensiones requeridas. Después agrega el repositorio oficial de Zabbix 7.4 e instala el servidor, el frontend, los scripts SQL, la política SELinux y el agente local [3] [4].
 
 ```bash
 sudo dnf install -y mariadb-server httpd php php-fpm php-mysqlnd \
@@ -79,16 +107,24 @@ sudo dnf install -y zabbix-server-mysql zabbix-web-mysql \
   zabbix-apache-conf zabbix-sql-scripts zabbix-selinux-policy zabbix-agent
 ```
 
-Comprueba las versiones y servicios:
+Comprueba los paquetes instalados y el estado inicial de los servicios:
 
 ```bash
 rpm -q zabbix-server-mysql zabbix-web-mysql zabbix-agent mariadb-server
 sudo systemctl --no-pager --full status mariadb httpd php-fpm
 ```
 
-## 3. Crear la base de datos de Zabbix
+La captura siguiente sirve como referencia visual para la preparación del repositorio y la instalación de los paquetes:
 
-Ejecuta `sudo mariadb` y escribe las siguientes sentencias. El texto que aparece como prompt, por ejemplo `MariaDB [(none)]>`, no forma parte del comando.
+![Instalación del repositorio y de los paquetes de Zabbix](docs/assets/image2.png)
+
+Una vez instalados los componentes, valida que el sistema reconoce los paquetes y que los servicios base se encuentran disponibles:
+
+![Comprobación de los componentes instalados](docs/assets/image3.png)
+
+### 2.2 Crear la base de datos
+
+Ejecuta `sudo mariadb` y crea una base de datos y un usuario dedicado. Sustituye el marcador por un secreto largo que no se publique en GitHub:
 
 ```sql
 CREATE DATABASE zabbix CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
@@ -99,20 +135,22 @@ FLUSH PRIVILEGES;
 EXIT;
 ```
 
-Importa el esquema inicial. El cliente solicitará la contraseña de la cuenta `zabbix`:
+Importa el esquema inicial y desactiva después el ajuste temporal:
 
 ```bash
 zcat /usr/share/zabbix/sql-scripts/mysql/server.sql.gz \
   | mysql --default-character-set=utf8mb4 -uzabbix -p zabbix
-```
 
-Después de la importación, desactiva el ajuste temporal:
-
-```bash
 sudo mariadb -e "SET GLOBAL log_bin_trust_function_creators = 0;"
 ```
 
-Edita `/etc/zabbix/zabbix_server.conf` y configura la contraseña de la base:
+La secuencia de creación e inicialización de la base de datos puede contrastarse con estas capturas de apoyo:
+
+![Creación de la base de datos de Zabbix](docs/assets/image4.png)
+
+![Importación del esquema y preparación de los servicios](docs/assets/image5.png)
+
+Edita `/etc/zabbix/zabbix_server.conf`:
 
 ```ini
 DBName=zabbix
@@ -120,23 +158,23 @@ DBUser=zabbix
 DBPassword=CAMBIAR_POR_UN_SECRETO_LARGO
 ```
 
-Protege el archivo y no lo publiques:
+Protege el archivo de configuración y evita publicarlo:
 
 ```bash
 sudo chown root:zabbix /etc/zabbix/zabbix_server.conf
 sudo chmod 640 /etc/zabbix/zabbix_server.conf
 ```
 
-## 4. Firewall, SELinux y servicios
+### 2.3 Firewall, SELinux y servicios
 
-No desactives SELinux como solución general. Comprueba su estado y revisa los rechazos antes de realizar cambios:
+No desactives SELinux como solución general. Comprueba su estado y revisa los rechazos recientes antes de realizar ajustes:
 
 ```bash
 getenforce
 sudo ausearch -m AVC -ts recent 2>/dev/null | tail -n 20 || true
 ```
 
-Para un laboratorio que utiliza comprobaciones activas desde el equipo físico, abre HTTP y el puerto del servidor Zabbix:
+En un laboratorio con comprobaciones activas desde el equipo físico, abre únicamente HTTP y el puerto del servidor Zabbix:
 
 ```bash
 sudo firewall-cmd --permanent --add-service=http
@@ -145,7 +183,7 @@ sudo firewall-cmd --reload
 sudo firewall-cmd --list-all
 ```
 
-Activa los servicios y verifica los puertos:
+Activa los servicios y comprueba los puertos:
 
 ```bash
 sudo systemctl enable --now zabbix-server zabbix-agent httpd php-fpm
@@ -153,7 +191,9 @@ sudo systemctl --no-pager --full status zabbix-server zabbix-agent httpd php-fpm
 sudo ss -lntp | grep -E ':80|:10051|:10050' || true
 ```
 
-Abre `http://ZABBIX_SERVER_IP/zabbix` y completa el asistente web con:
+## 3. Configurar el frontend web
+
+Abre `http://ZABBIX_SERVER_IP/zabbix` y completa el asistente con la base de datos creada:
 
 | Campo | Valor |
 |---|---|
@@ -161,15 +201,39 @@ Abre `http://ZABBIX_SERVER_IP/zabbix` y completa el asistente web con:
 | Database host | `localhost` |
 | Database name | `zabbix` |
 | User | `zabbix` |
-| Password | La contraseña creada para la base |
+| Password | La contraseña de la base |
 | Zabbix server name | Un nombre descriptivo, por ejemplo `Global` |
 | Time zone | La misma configurada en CentOS |
 
-## 5. Conectar el equipo físico
+La pantalla de requisitos previos del frontend permite confirmar que Apache, PHP y los módulos necesarios están disponibles:
 
-La documentación de Zabbix define los parámetros `Hostname`, `Server` y `ServerActive` del agente UNIX [5]. El nombre configurado en `Hostname` debe coincidir con el nombre del host creado en Zabbix.
+![Requisitos previos del frontend web de Zabbix](docs/assets/image6.png)
 
-### Opción recomendada: agente activo
+En la pantalla de base de datos introduce el host, el nombre de la base, el usuario y la contraseña definidos anteriormente. No reutilices el usuario `root` para la conexión de Zabbix:
+
+![Configuración de la conexión entre Zabbix y MariaDB](docs/assets/image7.png)
+
+A continuación define el nombre visible del servidor y la zona horaria. Mantener una zona horaria coherente facilita la interpretación de históricos y eventos:
+
+![Nombre visible y zona horaria del servidor](docs/assets/image8.png)
+
+Revisa el resumen antes de finalizar. Comprueba especialmente el tipo de base de datos, el nombre del servidor y la zona horaria:
+
+![Resumen de la preinstalación de Zabbix](docs/assets/image9.png)
+
+Al terminar, el asistente confirma la instalación y permite acceder al panel:
+
+![Confirmación de la instalación de Zabbix](docs/assets/image10.png)
+
+El panel inicial sirve como evidencia visual de que el frontend quedó operativo:
+
+![Panel inicial de Zabbix](docs/assets/image11.png)
+
+## 4. Conectar el equipo físico
+
+La documentación de Zabbix define los parámetros `Hostname`, `Server` y `ServerActive` del agente UNIX [5]. El valor de `Hostname` debe coincidir exactamente con el nombre del host creado en la interfaz web.
+
+### 4.1 Modalidad activa, recomendada para comenzar
 
 En el equipo físico autorizado instala el agente oficial correspondiente a su sistema operativo. Para otro CentOS Stream 10, el ejemplo es:
 
@@ -187,7 +251,7 @@ ServerActive=ZABBIX_SERVER_IP:10051
 Hostname=MONITORED_HOST_NAME
 ```
 
-Activa el agente:
+Activa el agente y revisa sus registros:
 
 ```bash
 sudo systemctl enable --now zabbix-agent
@@ -201,9 +265,9 @@ Desde el equipo físico prueba la salida hacia la VM:
 nc -vz ZABBIX_SERVER_IP 10051
 ```
 
-### Opción pasiva
+### 4.2 Modalidad pasiva
 
-En la modalidad pasiva el servidor consulta al agente por `TCP/10050`. Configura:
+En la modalidad pasiva el servidor consulta al agente por `TCP/10050`:
 
 ```ini
 Server=ZABBIX_SERVER_IP
@@ -212,7 +276,7 @@ Hostname=MONITORED_HOST_NAME
 ListenPort=10050
 ```
 
-Abre el puerto en el firewall del equipo físico únicamente para la IP del servidor:
+Si el equipo físico usa `firewalld`, permite el acceso únicamente desde la IP del servidor:
 
 ```bash
 sudo firewall-cmd --permanent \
@@ -226,9 +290,9 @@ Desde la VM prueba la conexión:
 nc -vz MONITORED_HOST_IP 10050
 ```
 
-### Crear el host en la interfaz web
+### 4.3 Registrar el host en Zabbix
 
-En Zabbix selecciona **Data collection → Hosts → Create host** y configura:
+En la interfaz web selecciona **Data collection → Hosts → Create host** y utiliza los siguientes valores:
 
 | Campo | Ejemplo |
 |---|---|
@@ -239,23 +303,31 @@ En Zabbix selecciona **Data collection → Hosts → Create host** y configura:
 | Port | `10050` |
 | Template | `Linux by Zabbix agent` o la plantilla del sistema |
 
-Zabbix documenta `10050/TCP` para el agente, `10051/TCP` para el servidor/proxy/trapper, `80/TCP` para HTTP y `443/TCP` para HTTPS [8]. En redes no confiables, configura TLS con certificados o PSK; no publiques la clave en Git [9].
+Zabbix documenta `10050/TCP` para el agente, `10051/TCP` para el servidor, proxy o trapper, `80/TCP` para HTTP y `443/TCP` para HTTPS [8]. En redes no confiables, configura TLS con certificados o PSK y nunca publiques la clave en el repositorio [9].
 
-## 6. Configurar alertas por correo
+## 5. Configurar alertas por correo
 
 Zabbix utiliza un **medio** para entregar el correo y una **acción** para decidir cuándo enviarlo [6] [7].
 
 1. Entra en **Alerts → Media types** y crea o edita el tipo **Email**.
 2. Selecciona `Generic SMTP` o el proveedor recomendado.
 3. Configura el servidor, puerto, remitente, seguridad de conexión y autenticación.
-4. Usa OAuth, relay SMTP o una contraseña de aplicación según la política del proveedor.
+4. Utiliza OAuth, un relay SMTP o una contraseña de aplicación conforme a la política del proveedor.
 5. En **Users → Users**, asigna el medio a un usuario o grupo autorizado y define `ALERT_EMAIL` como destinatario.
-6. En **Alerts → Actions → Trigger actions**, crea una acción con una condición como `Host group = Laboratorio autorizado` y `Trigger severity >= Warning`.
+6. En **Alerts → Actions → Trigger actions**, crea una acción con condiciones como `Host group = Laboratorio autorizado` y `Trigger severity >= Warning`.
 7. Añade la operación **Send message** al medio Email y habilita el mensaje de recuperación.
+
+La configuración del proveedor debe realizarse sin publicar credenciales. La captura de apoyo muestra el flujo de generación de una contraseña de aplicación; el valor visible fue redactado antes de incorporarlo al repositorio:
+
+![Configuración segura de una contraseña de aplicación](docs/assets/image12.png)
+
+La cuenta de aplicación y sus datos identificables también deben sustituirse por valores de ejemplo antes de compartir el material:
+
+![Cuenta de aplicación redactada](docs/assets/image13.png)
 
 Para probar el medio, ve a **Alerts → Media types → Email → Test**, introduce un destinatario autorizado, asunto y mensaje, y pulsa **Test**. La documentación oficial describe esta prueba [6].
 
-Usa un mensaje técnico y mínimo:
+Un mensaje técnico y mínimo puede utilizar las siguientes macros:
 
 ```text
 Asunto: [Zabbix][{TRIGGER.SEVERITY}] {HOST.NAME}: {TRIGGER.NAME}
@@ -269,48 +341,59 @@ Hora: {EVENT.DATE} {EVENT.TIME}
 Evento: {EVENT.ID}
 ```
 
-No incluyas contraseñas, contenido de archivos, pulsaciones, capturas de pantalla, historial privado ni interpretaciones sobre la conducta de una persona.
+La evidencia de recepción debe revisarse eliminando direcciones personales y cualquier secreto antes de publicarla:
 
-## 7. Prueba controlada de alarma
+![Correo de alarma recibido con datos redactados](docs/assets/image14.png)
+
+Finalmente, la prueba del tipo de medio debe mostrar un envío exitoso al buzón autorizado:
+
+![Prueba del medio Email en Zabbix](docs/assets/image15.png)
+
+## 6. Prueba controlada y operación responsable
 
 Realiza la prueba únicamente sobre un equipo autorizado y un servicio de laboratorio no crítico. Detén el servicio durante un intervalo acordado, verifica que aparece el problema en Zabbix y comprueba la recepción del correo. Después restáuralo y confirma el mensaje de recuperación. Revisa **Reports → Action log** para correlacionar el evento y la notificación.
 
-Ejemplos apropiados de alarmas:
+Ejemplos apropiados de alarmas técnicas son los siguientes:
 
-| Evento | Mensaje técnico |
+| Evento | Mensaje operativo |
 |---|---|
 | Agente sin respuesta | El equipo físico no responde durante 5 minutos. |
 | Disco lleno | El punto de montaje `/` supera 85 %. |
 | Servicio detenido | `app-demo.service` está detenido. |
 | Proceso autorizado ausente | El proceso `app-demo` no está ejecutándose. |
 
-No utilices Zabbix para registrar actividades personales de forma encubierta. Si una organización necesita un control de cumplimiento, documenta el propósito, la autorización, las métricas recogidas, el acceso y el tiempo de retención.
+No utilices Zabbix para registrar actividades personales de forma encubierta. Si una organización necesita un control de cumplimiento, documenta el propósito, la autorización, las métricas recogidas, los permisos de acceso y el tiempo de retención.
 
-## 8. Capturas de apoyo
+## Alcance y privacidad
 
-Las capturas procedentes del material de apoyo están disponibles en [`docs/assets/`](docs/assets/). Las imágenes 12 a 15 fueron redactadas para eliminar credenciales de aplicación y direcciones personales antes de publicarse.
+El monitoreo debe limitarse a métricas técnicas necesarias para el objetivo definido: disponibilidad, CPU, memoria, almacenamiento, estado de servicios y procesos expresamente autorizados. No deben recopilarse pulsaciones, contenido de archivos, capturas de pantalla, historial privado ni interpretaciones sobre la conducta de una persona.
 
-| Figura | Enlace |
-|---:|---|
-| 1 | [Instalación del repositorio y paquetes](docs/assets/image1.png) |
-| 2 | [Validación del repositorio](docs/assets/image2.png) |
-| 3 | [Instalación de paquetes](docs/assets/image3.png) |
-| 4 | [Creación de la base de datos](docs/assets/image4.png) |
-| 5 | [Esquema y servicios](docs/assets/image5.png) |
-| 6 | [Requisitos del frontend](docs/assets/image6.png) |
-| 7 | [Conexión con la base de datos](docs/assets/image7.png) |
-| 8 | [Nombre y zona horaria](docs/assets/image8.png) |
-| 9 | [Resumen de preinstalación](docs/assets/image9.png) |
-| 10 | [Instalación completada](docs/assets/image10.png) |
-| 11 | [Panel de Zabbix](docs/assets/image11.png) |
-| 12 | [Contraseña de aplicación redactada](docs/assets/image12.png) |
-| 13 | [Configuración de aplicación redactada](docs/assets/image13.png) |
-| 14 | [Correo recibido redactado](docs/assets/image14.png) |
-| 15 | [Prueba del medio Email redactada](docs/assets/image15.png) |
+Antes de publicar o compartir este repositorio, revisa que no contenga contraseñas de MariaDB, contraseñas de aplicación SMTP, tokens, claves TLS/PSK, archivos `.env`, logs ni direcciones privadas. Si una credencial del material original fue utilizada, revócala y genera una nueva.
 
-## Seguridad antes de publicar
+## Reutilizar la carpeta de imágenes en otro repositorio
 
-Nunca subas contraseñas de MariaDB, contraseñas de aplicación SMTP, tokens, claves TLS/PSK, archivos `.env`, direcciones privadas ni logs sin revisar. Si una credencial del material original fue utilizada, revócala y genera una nueva. No expongas el panel ni el agente directamente a Internet.
+Para copiar las imágenes a otro proyecto local, coloca ambos repositorios en el mismo directorio y ejecuta:
+
+```bash
+cp -R Aplicaciones_Moviles/docs/assets \
+  OTRO_REPOSITORIO/docs/assets
+cd OTRO_REPOSITORIO
+git add docs/assets
+git commit -m "docs: añadir capturas de apoyo"
+git push origin main
+```
+
+Si el otro repositorio está vacío, también puedes copiar la carpeta completa y publicar desde allí:
+
+```bash
+cp -R /ruta/Aplicaciones_Moviles/docs/assets /ruta/OTRO_REPOSITORIO/docs/
+cd /ruta/OTRO_REPOSITORIO
+git add docs/assets
+git commit -m "docs: añadir capturas de apoyo"
+git push origin main
+```
+
+En GitHub, la alternativa visual es abrir el repositorio destino, entrar en `docs/assets/`, seleccionar **Add file → Upload files**, elegir `image1.png` hasta `image15.png` y confirmar el commit. En el README del repositorio destino utiliza rutas relativas como `docs/assets/image1.png`.
 
 ## Referencias
 
