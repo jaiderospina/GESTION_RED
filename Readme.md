@@ -11,7 +11,7 @@ Este proyecto presenta una ruta reproducible para instalar **CentOS Stream 10** 
 
 > **Objetivo del laboratorio:** observar la disponibilidad, el rendimiento y los eventos técnicos de equipos autorizados, y notificar los problemas relevantes a un buzón operativo.
 
-> **Importante:** Zabbix debe utilizarse con autorización, transparencia y una finalidad definida. Este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta.
+> **Importante:**  Este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta.
 
 ## Recorrido rápido
 
@@ -23,7 +23,7 @@ Este proyecto presenta una ruta reproducible para instalar **CentOS Stream 10** 
 | 04 · Alertar | Medio Email, acción y prueba controlada |
 | 05 · Operar | Monitoreo técnico, seguro y documentado |
 
-El procedimiento se apoya visualmente en las capturas originales del documento `CapGestion.docx`. Las imágenes que contenían credenciales o datos personales fueron redactadas antes de publicarse en [`docs/assets/`](docs/assets/).
+
 
 ## Arquitectura
 
@@ -42,7 +42,7 @@ El procedimiento se apoya visualmente en las capturas originales del documento `
                                                    └────────────────────┘
 ```
 
-Para este laboratorio se recomienda configurar la VM con **adaptador puente**. Así, la máquina virtual obtiene una dirección propia en la red autorizada y puede comunicarse directamente con el equipo físico. VirtualBox documenta que NAT permite la salida de la VM, pero mantiene la máquina aislada de conexiones entrantes salvo que se configure redirección de puertos [1].
+Para este laboratorio se recomienda configurar la VM con **adaptador puente**. Así, la máquina virtual obtiene una dirección propia en la red autorizada y puede comunicarse directamente con el equipo físico. VirtualBox documenta que NAT permite la salida de la VM, pero mantiene la máquina aislada de conexiones entrantes salvo que se configure redirección de puertos.
 
 ## Requisitos sugeridos
 
