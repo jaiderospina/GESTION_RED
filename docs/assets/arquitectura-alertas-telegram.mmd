@@ -1,0 +1,17 @@
+flowchart LR
+  A[Equipo autorizado<br/>Zabbix Agent] --> B[Checks locales]
+  B --> B1[Tamaño de carpetas<br/>gestion.folder.size]
+  B --> B2[Estado de interfaz<br/>gestion.if.status]
+  B1 --> C[Zabbix Server 7.4]
+  B2 --> C
+  C --> D[Trigger de carpeta o NIC]
+  D --> E[Acción de notificación]
+  E --> F[Webhook Telegram]
+  F --> G[Bot Telegram]
+  G --> H[Chat o grupo autorizado]
+  C --> I[Email existente]
+
+  classDef primary fill:#d40000,color:#fff,stroke:#8c0000;
+  classDef check fill:#e8f1ff,color:#111,stroke:#4472c4;
+  class C,D,E,F primary;
+  class B1,B2 check;
