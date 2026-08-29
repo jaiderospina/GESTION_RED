@@ -349,7 +349,140 @@ Finalmente, la prueba del tipo de medio debe mostrar un envío exitoso al buzón
 
 ![Prueba del medio Email en Zabbix](docs/assets/image15.png)
 
-## 6. Prueba controlada y operación responsable
+## 6. Alertas de tamaño de carpetas, tarjeta de red y Telegram
+
+Esta sección se agrega a la secuencia existente. Los controles son determinísticos: el agente calcula el tamaño de carpetas autorizadas y consulta el estado operativo de interfaces Linux; Zabbix evalúa los umbrales y entrega las notificaciones por correo y Telegram. Zabbix 7.4 documenta la clave nativa `vfs.dir.size` para tamaños de directorios y `net.if.discovery` para descubrir interfaces [10] [11]. Para mantener un comportamiento explícito y portable en este laboratorio se incorporan dos `UserParameter` pequeños y auditables.
+
+![Arquitectura de alertas de carpetas, tarjeta de red y Telegram](docs/assets/arquitectura-alertas-telegram.png)
+
+### 6.1 Copiar e instalar los checks en el equipo monitoreado
+
+Desde el equipo autorizado, copia la carpeta `monitoring/zabbix-agent` de este repositorio. No copies tokens ni contraseñas al repositorio. Ejecuta:
+
+```bash
+cd monitoring/zabbix-agent
+sudo ./install.sh
+```
+
+El instalador coloca los scripts en `/usr/local/libexec/zabbix`, registra los parámetros en `/etc/zabbix/zabbix_agentd.d/gestion-red.conf`, aplica permisos restrictivos y reinicia el agente. Comprueba que los checks respondan:
+
+```bash
+sudo zabbix_agentd -t 'gestion.folder.size[/var/log]'
+sudo zabbix_agentd -t 'gestion.if.status[eth0]'
+```
+
+Sustituye `eth0` por la interfaz real obtenida con `ip -br link`. El check de interfaz devuelve `1` cuando el estado operativo es `up` o `unknown`, y `0` cuando está `down`, `dormant`, `lowerlayerdown` o no existe. La interfaz `unknown` puede ser normal para `lo`; para una tarjeta física utiliza el nombre mostrado por `ip -br link`.
+
+Si una carpeta no es legible por el usuario `zabbix`, concede únicamente el acceso mínimo al árbol autorizado. Por ejemplo, para una carpeta operativa específica:
+
+```bash
+sudo setfacl -m u:zabbix:rx /ruta
+sudo setfacl -R -m u:zabbix:rx /ruta/carpeta-monitoreada
+```
+
+No otorgues permisos amplios sobre `/home`, directorios privados ni árboles que no formen parte del objetivo autorizado.
+
+Los archivos agregados para esta fase son:
+
+| Archivo | Propósito |
+|---|---|
+| `monitoring/zabbix-agent/dir_size.sh` | Devuelve el tamaño de una carpeta en bytes y valida que la ruta sea absoluta. |
+| `monitoring/zabbix-agent/iface_status.sh` | Devuelve el estado operativo de una interfaz Linux como `1`, `0` o `2`. |
+| `monitoring/zabbix-agent/gestion-red.conf` | Registra las claves `gestion.folder.size[*]` y `gestion.if.status[*]`. |
+| `monitoring/zabbix-agent/install.sh` | Instala los archivos con permisos restrictivos y reinicia el agente. |
+| `monitoring/zabbix-server/media_telegram.yaml` | Definición oficial del medio webhook de Telegram para importar en Zabbix 7.4. |
+
+### 6.2 Crear los ítems en Zabbix
+
+En **Data collection → Hosts → equipo-fisico-01 → Items**, crea un ítem por cada carpeta y por cada tarjeta que deban monitorearse. Usa tipo **Zabbix agent (active)** si el host trabaja en modalidad activa; si se configuró la modalidad pasiva, usa **Zabbix agent**. El tipo de dato de ambos checks es **Numeric (unsigned)**.
+
+| Nombre sugerido | Key | Intervalo | Unidad |
+|---|---|---:|---|
+| Tamaño de `/var/log` | `gestion.folder.size[/var/log]` | `5m` | `B` |
+| Estado de `eth0` | `gestion.if.status[eth0]` | `1m` | — |
+
+Para varias carpetas, crea ítems separados, por ejemplo `gestion.folder.size[/var/lib/mysql]` o `gestion.folder.size[/opt/app-demo]`. Usa únicamente rutas que hayan sido autorizadas y evita colocar secretos dentro de los nombres o parámetros.
+
+### 6.3 Crear los triggers y umbrales
+
+En el host define macros de usuario para que los límites puedan cambiarse desde la interfaz sin editar scripts:
+
+| Macro | Ejemplo | Significado |
+|---|---:|---|
+| `{$FOLDER_VAR_LOG_LIMIT}` | `5368709120` | 5 GiB expresados en bytes. |
+| `{$FOLDER_MYSQL_LIMIT}` | `10737418240` | 10 GiB expresados en bytes. |
+| `{$IFACE_DOWN_FOR}` | `3m` | Tiempo continuo antes de alertar por una interfaz caída. |
+
+Crea un trigger de carpeta con esta expresión, ajustando el nombre del host y la macro al ítem correspondiente:
+
+```text
+last(/equipo-fisico-01/gestion.folder.size[/var/log])>{$FOLDER_VAR_LOG_LIMIT}
+```
+
+Usa severidad **Warning** o **Average** según la política del laboratorio. Para la tarjeta de red, crea el siguiente trigger:
+
+```text
+min(/equipo-fisico-01/gestion.if.status[eth0],{$IFACE_DOWN_FOR})=0
+```
+
+El primer trigger avisa cuando la carpeta supera el límite; el segundo exige que el estado haya permanecido en `0` durante el periodo configurado. Activa **OK event generation** para recibir la recuperación cuando la carpeta vuelva a estar por debajo del umbral o la interfaz vuelva a estar operativa.
+
+### 6.4 Configurar Telegram en Zabbix 7.4
+
+Zabbix mantiene un medio oficial de tipo webhook para Telegram 7.4, con soporte para notificaciones personales y de grupos [12]. El procedimiento es el siguiente:
+
+1. En Telegram abre `@BotFather`, envía `/newbot`, completa el asistente y guarda el token en un gestor de secretos. El token nunca debe publicarse en GitHub, capturas ni logs.
+2. Para una notificación personal, obtén el chat ID mediante `@myidbot` siguiendo el procedimiento documentado por Zabbix y envía `/start` al bot nuevo. Para un grupo, agrega el bot y obtiene el ID del grupo; los grupos suelen usar un ID negativo.
+3. En Zabbix entra en **Alerts → Media types → Import** e importa `monitoring/zabbix-server/media_telegram.yaml`.
+4. Abre el medio **Telegram**, activa **Enabled**, configura `api_token` con el token del bot y selecciona `html` o `markdown` como `api_parse_mode`. No guardes el token en archivos del repositorio.
+5. En **Users → Users**, abre el usuario operativo, selecciona **Media → Add**, elige **Telegram** y coloca el chat ID en **Send to**. Si se usa un tópico de supergrupo, utiliza el formato `-1001234567890:2`.
+6. Crea una acción separada en **Alerts → Actions → Trigger actions**. Filtra por el grupo `Laboratorio autorizado` y por severidad igual o mayor que **Warning**. Agrega la operación **Send message** al medio Telegram y activa el mensaje de recuperación.
+7. Mantén la acción de Email existente separada de la acción de Telegram. Así se conserva el formato de correo actual y se evitan etiquetas Markdown o HTML sin interpretar en otros medios.
+
+Un mensaje recomendado para la acción es:
+
+```text
+<b>{EVENT.SEVERITY}</b> · {HOST.NAME}
+Problema: {TRIGGER.NAME}
+Estado: {TRIGGER.STATUS}
+Hora: {EVENT.DATE} {EVENT.TIME}
+Evento: {EVENT.ID}
+```
+
+La guía oficial de Zabbix identifica `api_token`, `api_parse_mode` y `{ALERT.SENDTO}` como parámetros del webhook [12]. En consecuencia, el token se configura únicamente en la interfaz de Zabbix y el destinatario queda asociado al medio del usuario.
+
+### 6.5 Pruebas controladas
+
+Primero prueba el medio sin generar una falla: entra en **Alerts → Media types → Telegram → Test**, selecciona un usuario o destinatario autorizado y confirma que el mensaje llega al chat. Después valida los checks desde el equipo monitoreado:
+
+```bash
+sudo zabbix_agentd -t 'gestion.folder.size[/var/log]'
+sudo zabbix_agentd -t 'gestion.if.status[eth0]'
+```
+
+Para una prueba de carpeta, reduce temporalmente el valor de `{$FOLDER_VAR_LOG_LIMIT}` por debajo del dato observado; espera el intervalo de actualización, comprueba el problema en **Monitoring → Problems** y confirma Email y Telegram. Restaura el umbral original y verifica el evento de recuperación.
+
+Para probar una tarjeta de red, utiliza únicamente una interfaz de laboratorio y una ventana acordada. Desconecta el enlace o deshabilita temporalmente la interfaz, verifica el evento y restáurala de inmediato:
+
+```bash
+sudo nmcli device disconnect eth0
+sudo nmcli device connect eth0
+```
+
+No realices esta prueba sobre la interfaz que mantiene la sesión remota ni sobre equipos o servicios no autorizados. Revisa **Reports → Action log** para correlacionar el evento, la recuperación y el envío a Telegram.
+
+### 6.6 Solución de problemas
+
+| Síntoma | Comprobación |
+|---|---|
+| El ítem aparece como unsupported | Revisa `sudo journalctl -u zabbix-agent -n 100 --no-pager`, la ruta absoluta, los permisos del árbol y que `gestion-red.conf` esté en `zabbix_agentd.d`. |
+| El tamaño devuelve error de permisos | Comprueba el acceso efectivo del usuario `zabbix` y aplica ACL mínima solo al directorio autorizado. |
+| La interfaz no genera recuperación | Confirma que el key usa el nombre real de `ip -br link` y que el trigger no tenga un periodo excesivo. |
+| Telegram no recibe mensajes | Usa **Test** del medio, verifica el token, el chat ID y que el usuario haya enviado `/start` al bot. |
+| Telegram devuelve error de formato | Cambia `api_parse_mode` a `html` y usa etiquetas válidas; mantén la acción separada del Email. |
+| Se filtró un token | Revoca el token en `@BotFather`, genera uno nuevo y revisa el historial del repositorio antes de compartirlo. |
+
+## 7. Prueba controlada y operación responsable
 
 Realiza la prueba únicamente sobre un equipo autorizado y un servicio de laboratorio no crítico. Detén el servicio durante un intervalo acordado, verifica que aparece el problema en Zabbix y comprueba la recepción del correo. Después restáuralo y confirma el mensaje de recuperación. Revisa **Reports → Action log** para correlacionar el evento y la notificación.
 
@@ -391,3 +524,10 @@ Antes de publicar o compartir este repositorio, revisa que no contenga contrase�
  8.https://www.zabbix.com/documentation/7.4/en/manual/installation/requirements "Zabbix 7.4 — Requirements and default ports"
  
  9.https://www.zabbix.com/documentation/7.4/en/manual/encryption "Zabbix 7.4 — Encryption"
+
+
+10. https://www.zabbix.com/documentation/7.4/en/manual/config/items/itemtypes/zabbix_agent "Zabbix 7.4 — Zabbix agent item keys"
+
+11. https://www.zabbix.com/documentation/7.4/en/manual/discovery/low_level_discovery/examples/network_interfaces "Zabbix 7.4 — Discovery of network interfaces"
+
+12. https://www.zabbix.com/integrations/telegram "Zabbix — Telegram webhook integration"
