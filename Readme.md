@@ -534,313 +534,432 @@ Antes de publicar o compartir este repositorio, revisa que no contenga contrase�
 
 
 ---
+# Windows 11 + SNMP + Zabbix 7.4
 
+[![Windows 11](https://img.shields.io/badge/OS-Windows%2011-0078D4?logo=windows&logoColor=white )](https://www.microsoft.com/windows/windows-11 )
+[![CentOS Stream 10](https://img.shields.io/badge/Servidor-CentOS%20Stream%2010-262577?logo=centos&logoColor=white )](https://www.centos.org/stream/ )
+[![Zabbix 7.4](https://img.shields.io/badge/Zabbix-7.4-d40000?logo=zabbix&logoColor=white )](https://www.zabbix.com/ )
+[![SNMP v2c](https://img.shields.io/badge/Protocolo-SNMP%20v2c-1f6feb )](#seguridad-y-alcance)
+[![Monitoreo autorizado](https://img.shields.io/badge/monitoreo-autorizado-1f6feb )](#alcance-y-privacidad)
 
-# Monitorización autorizada de Windows 11 mediante SNMP con Zabbix
+## Laboratorio de monitorización de Windows sin agente Zabbix
 
-Procedimiento reproducible para incorporar Windows 11 24H2 a Zabbix 7.4 mediante SNMP v2c, sin instalar el agente nativo de Zabbix.
+Este proyecto documenta la incorporación de un equipo **Windows 11 24H2** a **Zabbix 7.4.13**, utilizando el servicio SNMP incluido como característica opcional de Windows y sin instalar el agente nativo de Zabbix en el equipo monitorizado.
 
-![Windows 11](https://www.microsoft.com/windows/windows-11) · ![CentOS Stream](https://www.centos.org/stream/) · ![Zabbix](https://www.zabbix.com/) · [Monitoreo autorizado](#alcance-y-privacidad) · [SNMP RFC 3416](https://www.rfc-editor.org/rfc/rfc3416)
+> **Objetivo del laboratorio:** observar de forma autorizada la disponibilidad, la identidad del sistema, las interfaces de red y un conjunto básico de recursos de Windows mediante consultas SNMPv2c.
 
-> Laboratorio de monitorización técnica
-
-Este proyecto presenta una ruta reproducible para observar la disponibilidad y el estado técnico de un equipo Windows 11 autorizado desde un servidor Zabbix. La recopilación se limita a métricas expuestas por SNMP, como identidad del sistema, tiempo activo, servicios SNMP e información de red disponible en los OID habilitados.
-
-**Objetivo del laboratorio:** validar una integración SNMP documentada, restringida y auditable entre Windows 11 y Zabbix.
-
-
+> **Importante:** este procedimiento no incluye keylogging, captura encubierta de pantalla, lectura de archivos privados, interceptación de comunicaciones ni vigilancia secreta. Solo se consultan los OIDs expuestos por el agente SNMP del equipo autorizado.
 
 ## Recorrido rápido
 
 | Fase | Resultado |
 |---|---|
-| 01 · Preparar | Herramientas SNMP instaladas en el servidor |
-| 02 · Instalar | Servicio SNMP activo en Windows 11 |
-| 03 · Configurar | Comunidad de solo lectura y agente habilitado |
-| 04 · Validar | Firewall y `snmpwalk` responden correctamente |
-| 05 · Registrar | Equipo, plantilla y macro configurados en Zabbix |
-| 06 · Restringir | Consultas limitadas a la dirección del servidor |
+| 01 · Preparar | Servidor Zabbix operativo, con soporte SNMP y herramientas `net-snmp` |
+| 02 · Instalar | Servicio SNMP habilitado en Windows 11 |
+| 03 · Configurar | Comunidad de solo lectura, servicios del agente y firewall UDP/161 |
+| 04 · Validar | Respuesta directa confirmada con `snmpwalk` |
+| 05 · Conectar | Equipo creado en Zabbix con interfaz SNMP y plantilla `Windows by SNMP` |
+| 06 · Restringir | Acceso SNMP limitado a los orígenes autorizados |
+| 07 · Operar | Verificación de datos, mantenimiento y resolución de incidencias |
 
-## Índice
+## Arquitectura
 
-1. [Objetivo y alcance](#objetivo-y-alcance)
-2. [Entorno de referencia](#entorno-de-referencia)
-3. [Arquitectura del flujo](#arquitectura-del-flujo)
-4. [Requisitos previos](#requisitos-previos)
-5. [Paso 1 — Preparar el servidor Zabbix](#paso-1--preparar-el-servidor-zabbix)
-6. [Paso 2 — Instalar SNMP en Windows](#paso-2--instalar-snmp-en-windows)
-7. [Paso 3 — Configurar comunidad y agente](#paso-3--configurar-comunidad-y-agente)
-8. [Paso 4 — Verificar el firewall](#paso-4--verificar-el-firewall)
-9. [Paso 5 — Validar con snmpwalk](#paso-5--validar-con-snmpwalk)
-10. [Paso 6 — Crear el equipo en Zabbix](#paso-6--crear-el-equipo-en-zabbix)
-11. [Paso 7 — Restringir el acceso](#paso-7--restringir-el-acceso)
-12. [Diagnóstico](#diagnóstico)
-13. [Lista de verificación](#lista-de-verificación)
-
-## Objetivo y alcance
-
-Este repositorio documenta cómo monitorizar un equipo Windows 11 24H2 desde Zabbix usando el servicio SNMP opcional de Windows. El servidor Zabbix inicia las consultas hacia UDP/161; Windows responde utilizando la comunidad configurada. La guía sigue la distribución del documento de referencia: cada etapa incluye contexto, comandos, resultado esperado y una imagen asociada.
-
-> **Aviso de seguridad:** SNMPv2c transmite la comunidad sin cifrar. Use una comunidad única, permisos de **solo lectura**, restrinja el origen al servidor Zabbix y prefiera SNMPv3 cuando su entorno lo permita.
-
-## Entorno de referencia
-
-| Elemento | Valor de ejemplo |
-|---|---|
-| Servidor de monitorización | Zabbix 7.4.13 sobre CentOS 10 |
-| Equipo monitorizado | Windows 11 24H2 |
-| IP del servidor Zabbix | `192.168.159.129` |
-| IP de Windows | `172.17.47.225` |
-| Comunidad | `zbx_monitor` |
-| Puerto | UDP `161` |
-| Plantilla | `Windows by SNMP` |
-| Tiempo estimado | 30–45 minutos |
-
-Sustituya las direcciones y la comunidad por valores de su instalación. No confirme valores de ejemplo en producción.
-
-## Arquitectura del flujo
-
-```mermaid
-flowchart LR
-    Z[Servidor Zabbix\n192.168.159.129] -- "SNMP GET / UDP 161" --> W[Windows 11\n172.17.47.225]
-    W -- "Respuesta SNMPv2c" --> Z
-    F[Firewall de Windows\nUDP 161 entrada] -. "permite" .-> W
+```text
+┌──────────────────────────────┐       UDP/161        ┌──────────────────────────────┐
+│ Windows 11 24H2              │ <─────────────────── │ VM CentOS Stream 10          │
+│ DESKTOP-FK5S8HJ              │   Consultas SNMP     │ Zabbix Server 7.4.13         │
+│ Servicio SNMP                 │ ──────────────────> │ MariaDB + Apache + PHP-FPM   │
+│ MIBs system / interfaces     │     Respuestas       │ Plantilla Windows by SNMP    │
+└──────────────────────────────┘                     └──────────────────────────────┘
+              │                                                   │
+              │ Firewall: UDP/161 entrante                        │
+              │                                                   │
+              └────────────── Red autorizada / NAT VMware ────────┘
 ```
 
-![Flujo de consultas SNMP](docs/images/01-flujo-snmp.png)
+El servidor Zabbix origina las consultas hacia el equipo Windows. Por ello, la regla principal del firewall se configura en Windows como tráfico **entrante** al puerto UDP/161. No es necesario abrir un puerto SNMP entrante en el servidor Zabbix para este escenario de consulta.
 
-La dirección de la flecha es significativa: el servidor Zabbix origina la consulta hacia UDP/161 y Windows devuelve la respuesta. Por ello, la regla principal debe habilitar tráfico entrante en Windows; no es necesario abrir un puerto entrante adicional en el servidor para esta consulta.
+Durante la implementación, el servidor utilizó la dirección `192.168.159.129` y el equipo Windows la dirección `172.17.47.225`. La comunicación atravesó NAT de VMware, aspecto que debe considerarse al restringir los hosts autorizados.
 
-## Requisitos previos
+## Requisitos sugeridos
 
-| Requisito | Verificación |
-|---|---|
-| Zabbix operativo | Servicios de base de datos, servidor y frontend activos |
-| Acceso Linux | `root` o `sudo` en el servidor |
-| Acceso Windows | PowerShell elevado y administrador local |
-| Red | El servidor alcanza la IP de Windows |
-| Descarga | Windows puede obtener la característica opcional SNMP |
+| Componente | Valor utilizado |
+|---|---:|
+| Servidor de monitorización | Zabbix 7.4.13 |
+| Sistema del servidor | CentOS 10 |
+| Dirección del servidor | `192.168.159.129` |
+| Equipo monitorizado | Windows 11 24H2, build 26200 |
+| Nombre del equipo | `DESKTOP-FK5S8HJ` |
+| Dirección del equipo | `172.17.47.225` |
+| Protocolo | SNMPv2c |
+| Puerto | UDP/161 |
+| Comunidad de ejemplo | `zbx_monitor` |
+| Plantilla | `Windows by SNMP` |
+| Permisos de la comunidad | Solo lectura |
+| Acceso requerido | Root en CentOS y administrador local en Windows |
+| Red | Conectividad entre el servidor y el equipo Windows |
 
-## Paso 1 — Preparar el servidor Zabbix
+Se recomienda utilizar una dirección IP estática o una reserva DHCP para el equipo monitorizado. Si la dirección cambia, Zabbix puede dejar de recolectar datos aunque el servicio SNMP continúe funcionando.
 
-Las utilidades de Net-SNMP permiten probar el agente de forma independiente antes de involucrar a Zabbix. Zabbix no necesita instalar `snmpwalk` para funcionar, pero sí requiere soporte SNMP en el proceso del servidor.
+## 1. Preparar el servidor Zabbix
 
-**CentOS/RHEL**
+Antes de modificar Windows, comprueba que Zabbix y sus servicios asociados están activos:
+
+```bash
+systemctl status zabbix-server httpd php-fpm mariadb --no-pager
+zabbix_server -V | head -3
+```
+
+La implementación de referencia utilizó Zabbix 7.4.13. Verifica también que el servidor fue compilado con soporte SNMP:
+
+```bash
+systemctl status zabbix-server --no-pager | grep "snmp poller"
+```
+
+La salida debe incluir un proceso similar a:
+
+```text
+/usr/sbin/zabbix_server: snmp poller #1 [got 0 values, queued 0 in 5 sec, awaiting 0]
+```
+
+Zabbix requiere soporte SNMP en el servidor para ejecutar las comprobaciones. La documentación oficial indica que la compilación debe incluir soporte para `net-snmp` [1].
+
+Instala las herramientas de diagnóstico:
 
 ```bash
 sudo dnf install -y net-snmp-utils
+which snmpwalk snmpget
 ```
 
-**Debian/Ubuntu**
+Estas herramientas no son necesarias para que el daemon de Zabbix funcione, pero permiten validar el agente de Windows sin involucrar todavía a la interfaz de Zabbix. En distribuciones basadas en Debian o Ubuntu, el paquete equivalente es:
 
 ```bash
-sudo apt update
 sudo apt install -y snmp
 ```
 
-Compruebe el poller SNMP:
+Comprueba la conectividad básica:
 
 ```bash
-systemctl status zabbix-server --no-pager | grep -i "snmp poller"
+ping -c3 172.17.47.225
+ip route
 ```
 
-Debe aparecer una línea similar a `snmp poller #1`. Si no aparece, revise que el binario de Zabbix tenga soporte SNMP.
+No abras puertos SNMP entrantes en el firewall del servidor solo para realizar esta integración. Las consultas se originan en el servidor y el tráfico de respuesta pertenece a una conexión ya iniciada.
 
-![Preparación del servidor](docs/images/02-preparacion-servidor.png)
+## 2. Instalar el servicio SNMP en Windows 11
 
-## Paso 2 — Instalar SNMP en Windows
+Todos los comandos de esta sección deben ejecutarse desde **PowerShell abierto con Ejecutar como administrador**. Tener una cuenta perteneciente al grupo de administradores no garantiza que una consola normal tenga el token elevado necesario.
 
-Abra **PowerShell → Ejecutar como administrador**. No basta con pertenecer al grupo de administradores si la consola no está elevada.
-
-### 2.1 Consultar el identificador
+### 2.1 Consultar la característica opcional
 
 ```powershell
 Get-WindowsCapability -Online -Name "SNMP*"
 ```
 
-El estado esperado antes de instalar es `NotPresent`. Utilice el identificador exacto que devuelva su compilación.
+Busca la característica `SNMP.Client~~~~0.0.1.0`. El estado inicial esperado es `NotPresent`.
 
-### 2.2 Instalar y verificar
+No asumas el identificador sin consultar la salida. El nombre puede variar entre compilaciones de Windows.
 
-```powershell
-$capability = Get-WindowsCapability -Online -Name "SNMP*" |
-    Where-Object Name -like "SNMP.Client*" |
-    Select-Object -First 1
-
-if (-not $capability) {
-    throw "No se encontró la característica SNMP.Client."
-}
-
-if ($capability.State -ne "Installed") {
-    Add-WindowsCapability -Online -Name $capability.Name
-}
-
-Set-Service -Name SNMP -StartupType Automatic
-Start-Service -Name SNMP
-Get-Service SNMP | Select-Object Name, Status, StartType
-```
-
-La salida esperada es `Status: Running` y `StartType: Automatic`. Si Windows solicita reinicio, reinicie antes de continuar.
-
-![Instalación de la característica SNMP](docs/images/03-instalacion-snmp.png) ![Servicio SNMP en ejecución](docs/images/04-servicio-snmp-ejecucion.png)
-
-**Importante:** `SNMP` responde consultas; `SNMPTrap` recibe notificaciones asíncronas. No son el mismo servicio.
-
-## Paso 3 — Configurar comunidad y agente
-
-La configuración clásica del agente se realiza en `services.msc`, no en la aplicación moderna de Configuración.
-
-1. Ejecute `services.msc`.
-2. Abra las propiedades de **Servicio SNMP**.
-3. En **Seguridad → Nombres de comunidad aceptados**, agregue `zbx_monitor` con derechos **SOLO LECTURA**.
-4. Durante la validación inicial marque **Aceptar paquetes SNMP de cualquier host**.
-5. En **Agente**, complete contacto y ubicación, y marque: **Físico**, **Aplicaciones**, **Vínculo de datos y subred**, **Internet** y **De extremo a extremo**.
-6. Pulse **Aplicar → Aceptar** y reinicie el servicio.
+### 2.2 Instalar SNMP
 
 ```powershell
-Restart-Service -Name SNMP
-Get-Service -Name SNMP
+Add-WindowsCapability -Online -Name "SNMP.Client~~~~0.0.1.0"
 ```
 
-![Comunidad de solo lectura](docs/images/05-reglas-firewall.png)
+La instalación puede tardar varios minutos y la barra de progreso puede permanecer quieta durante periodos prolongados. No cierres la consola mientras el comando siga ejecutándose.
 
-**Criterio aplicado:** no use `public`; la comunidad es sensible a mayúsculas y minúsculas. Conceda solo lectura porque la monitorización no necesita modificar el sistema.
+Si el título de la consola muestra el prefijo **Seleccionar**, PowerShell puede haber entrado en modo de selección de texto después de un clic accidental. Pulsa `Esc` o haz clic derecho para liberar la consola.
 
-## Paso 4 — Verificar el firewall
-
-Compruebe las reglas instaladas:
+Puedes abrir una segunda ventana para comprobar el estado sin interrumpir la instalación:
 
 ```powershell
-Get-NetFirewallRule -DisplayName "*SNMP*" |
-    Select-Object DisplayName, Enabled, Profile
+Get-WindowsCapability -Online -Name "SNMP*" | Select Name,State
+Get-Process TiWorker,TrustedInstaller -ErrorAction SilentlyContinue | Select Name,CPU
 ```
 
-Las reglas relevantes son las de **Servicio SNMP (UDP de entrada)**. Si no existe una regla activa para UDP/161, créela:
+Si el consumo de CPU de `TiWorker` cambia entre consultas, la instalación puede continuar progresando aunque la barra no avance de forma uniforme.
+
+### 2.3 Confirmar el servicio
 
 ```powershell
-New-NetFirewallRule `
-    -DisplayName "SNMP-In-UDP161" `
-    -Direction Inbound `
-    -Protocol UDP `
-    -LocalPort 161 `
-    -Action Allow `
-    -Profile Any
+Get-WindowsCapability -Online -Name "SNMP*" | Select Name,State
+Get-Service SNMP | Select Name,Status,StartType
 ```
 
-![Reglas del firewall](docs/images/05-reglas-firewall.png)
+El resultado esperado es:
 
-`-Profile Any` evita que una regla limitada al perfil Privado falle cuando Windows clasifica la red como Pública.
+```text
+Name        : SNMP
+Status      : Running
+StartType   : Automatic
+```
 
-## Paso 5 — Validar con snmpwalk
+`SNMP` y `SNMPTrap` no son equivalentes. `SNMP` es el servicio que responde a las consultas; `SNMPTrap` se utiliza para recibir notificaciones asíncronas.
 
-Ejecute el comando en el **servidor Linux**, no en Windows:
+Si la instalación indica `RestartNeeded : True`, reinicia Windows antes de continuar.
+
+Microsoft documenta la instalación de `SNMP.Client` mediante `Add-WindowsCapability` y considera SNMP una característica obsoleta, aunque todavía disponible en este escenario [3].
+
+## 3. Configurar la comunidad y el agente
+
+La configuración del servicio se realiza desde `services.msc`, no desde la aplicación moderna de Configuración de Windows 11.
+
+Abre la consola:
+
+```powershell
+services.msc
+```
+
+Localiza **Servicio SNMP**, abre sus propiedades y configura las pestañas **Seguridad** y **Agente**.
+
+### 3.1 Definir la comunidad
+
+En **Seguridad → Nombres de comunidad aceptados**, agrega:
+
+| Campo | Valor |
+|---|---|
+| Nombre de comunidad | `zbx_monitor` |
+| Derechos | `SOLO LECTURA` |
+
+Durante la primera validación marca temporalmente **Aceptar paquetes SNMP de cualquier host**. Esta apertura solo debe permanecer activa hasta comprobar la respuesta de `snmpwalk` y la recolección en Zabbix.
+
+No utilices `public` como comunidad. En SNMPv2c, la comunidad funciona como una credencial transmitida sin cifrado. El nombre distingue mayúsculas y minúsculas, por lo que debe coincidir exactamente con la macro configurada en Zabbix.
+
+### 3.2 Seleccionar los servicios del agente
+
+En la pestaña **Agente**, marca los cinco servicios disponibles:
+
+- Físico.
+- Aplicaciones.
+- Vínculo de datos y subred.
+- Internet.
+- De extremo a extremo.
+
+Cada selección habilita una rama distinta de OIDs. Si no se marcan, el agente puede responder con un conjunto reducido de datos y la plantilla de Zabbix puede dejar elementos sin soporte.
+
+### 3.3 Reiniciar el servicio
+
+Después de aplicar los cambios, reinicia el servicio:
+
+```powershell
+Restart-Service SNMP
+```
+
+El reinicio es obligatorio porque el agente SNMP de Windows lee la comunidad y los hosts permitidos durante el arranque del servicio.
+
+## 4. Verificar el firewall y validar SNMP
+
+### 4.1 Comprobar las reglas de Windows
+
+```powershell
+Get-NetFirewallRule -DisplayName "*SNMP*" | Select DisplayName,Enabled,Profile
+```
+
+Las reglas relevantes son las de **Servicio SNMP** para UDP entrante. Las reglas de captura de SNMP corresponden a traps y no son necesarias para esta integración basada en consultas.
+
+Si no existen reglas adecuadas, crea una regla específica:
+
+```powershell
+New-NetFirewallRule -DisplayName "SNMP-In-UDP161" `
+  -Direction Inbound `
+  -Protocol UDP `
+  -LocalPort 161 `
+  -Action Allow `
+  -Profile Any
+```
+
+El perfil `Any` evita que la regla deje de aplicar si Windows clasifica la conexión como pública, algo habitual en algunas conexiones Wi-Fi.
+
+### 4.2 Ejecutar `snmpwalk` desde CentOS
+
+La herramienta debe ejecutarse en el servidor Linux, no en Windows:
 
 ```bash
 snmpwalk -v2c -c zbx_monitor 172.17.47.225 .1.3.6.1.2.1.1
 ```
 
-La respuesta debe incluir `sysDescr`, `sysName`, `sysUpTime` y `sysServices`. El valor `sysServices` suele ser `79` cuando están activados los cinco servicios del agente.
+El comando consulta el grupo `system` y debe devolver información similar a la siguiente:
 
-![Respuesta correcta de snmpwalk](docs/images/06-snmpwalk-respuesta.png)
+| OID | Resultado de referencia | Confirmación |
+|---|---|---|
+| `sysDescr` | `Windows Version 6.3 (Build 26200 )` | El agente responde. El valor 6.3 es heredado y no representa necesariamente la versión real de Windows. |
+| `sysName` | `DESKTOP-FK5S8HJ` | La consulta corresponde al equipo previsto. |
+| `sysServices` | `79` | Los cinco servicios del agente están activos. |
+| `sysUpTime` | Un valor bajo tras reiniciar | La configuración recién aplicada está respondiendo. |
 
-Si hay timeout, revise en este orden: servicio SNMP en ejecución; comunidad idéntica; opción temporal de aceptar cualquier host; regla UDP/161; conectividad y rutas.
+Si la consulta expira, revisa en este orden:
 
-## Paso 6 — Crear el equipo en Zabbix
+1. El servicio `SNMP` está en ejecución.
+2. La comunidad coincide exactamente.
+3. El equipo está autorizado temporalmente como origen.
+4. La regla de firewall permite UDP/161.
+5. Existe conectividad entre las direcciones y rutas utilizadas.
 
-En la interfaz web vaya a **Recopilación de datos → Equipos → Crear equipo**. No use **Monitorización → Equipos**, que es solo de consulta.
+No continúes con la configuración de Zabbix hasta obtener respuesta directa con `snmpwalk`.
+
+Puedes consultar otras ramas del árbol SNMP:
+
+```bash
+# Recorrido completo
+snmpwalk -v2c -c zbx_monitor 172.17.47.225
+
+# Interfaces de red
+snmpwalk -v2c -c zbx_monitor 172.17.47.225 .1.3.6.1.2.1.2
+
+# Nombre del equipo
+snmpget -v2c -c zbx_monitor 172.17.47.225 .1.3.6.1.2.1.1.5.0
+```
+
+Zabbix recomienda utilizar `snmpwalk` para localizar y verificar los OIDs disponibles antes de crear elementos SNMP [1].
+
+## 5. Registrar el equipo en Zabbix
+
+El alta se realiza desde **Recopilación de datos → Equipos → Crear equipo**. La sección **Monitorización → Equipos** es una vista de consulta y no contiene el formulario de creación.
+
+### 5.1 Crear el host
+
+Utiliza estos valores:
 
 | Campo | Valor |
 |---|---|
-| Nombre de equipo | `Win11-SNMP` |
+| Nombre del equipo | `Win11-SNMP` |
 | Grupo | `Windows servers` |
 | Plantilla | `Windows by SNMP` |
-| Interfaz | `SNMP`, no `Agente` |
-| IP/Puerto | `172.17.47.225:161` |
-| Versión | `SNMPv2` |
+| Interfaz | SNMP, no Agente |
+| Dirección IP | `172.17.47.225` |
+| Puerto | `161` |
+| Versión SNMP | `SNMPv2` |
 | Comunidad | `{$SNMP_COMMUNITY}` |
 
-En la pestaña **Macros** agregue:
+Si el grupo `Windows servers` no existe, escribe el nombre y selecciona la opción `(nuevo)` ofrecida por Zabbix.
+
+No confundas `Windows by SNMP` con `Windows by Zabbix agent`. La primera plantilla consulta mediante SNMP; la segunda requiere el agente nativo de Zabbix.
+
+### 5.2 Definir la macro de comunidad
+
+En la pestaña **Macros** del host define:
 
 | Macro | Valor |
 |---|---|
 | `{$SNMP_COMMUNITY}` | `zbx_monitor` |
 
-Guarde el equipo y espere entre dos y tres minutos. El indicador SNMP debe quedar en verde. No seleccione **Windows by Zabbix agent**: utiliza un mecanismo diferente.
+Este es un paso crítico. Si la macro no se define, la plantilla puede utilizar `public` como valor heredado. En ese caso, `snmpwalk` funcionará, pero los elementos de Zabbix fallarán por utilizar una comunidad diferente.
 
-![Formulario del equipo SNMP](docs/images/07-formulario-equipo.png) ![Selección de plantilla y macro](docs/images/08-plantilla-macro.png)
+El uso de una macro facilita cambiar la comunidad sin modificar la interfaz SNMP y permite reutilizar la plantilla con diferentes credenciales.
 
-**Punto crítico:** si no define la macro, la plantilla puede heredar `public` y todos los elementos fallarán aunque `snmpwalk` funcione.
+### 5.3 Confirmar la recolección
 
-## Paso 7 — Restringir el acceso
+Guarda el host y espera entre dos y tres minutos. Comprueba lo siguiente:
 
-Una vez confirmada la recolección, cierre la apertura temporal:
+- El indicador de la interfaz SNMP aparece en verde.
+- El host muestra la plantilla `Windows by SNMP`.
+- Los elementos comienzan a recibir datos.
+- El número de elementos activos se aproxima a los **68** observados en la implementación de referencia.
 
-1. Vuelva a las propiedades de **Servicio SNMP → Seguridad**.
-2. Seleccione **Aceptar paquetes SNMP de estos hosts**.
-3. Agregue `192.168.159.129` (la IP real que ve Windows).
-4. Aplique los cambios y reinicie:
+Si un elemento aparece como **No soportado**, abre **Recopilación de datos → Equipos → Win11-SNMP → Elementos** y revisa el mensaje de error y el OID correspondiente.
+
+Las plantillas preconfiguradas de Zabbix están diseñadas para simplificar la incorporación de objetivos de monitorización [2].
+
+## 6. Restringir el acceso SNMP
+
+Una vez confirmada la recolección, cierra la apertura temporal de **Aceptar paquetes SNMP de cualquier host**.
+
+En **services.msc → Servicio SNMP → Seguridad**, selecciona **Aceptar paquetes SNMP de estos hosts** y agrega únicamente los orígenes autorizados.
+
+En una instalación directa puede ser suficiente la dirección del servidor Zabbix. En la implementación documentada existía NAT de VMware, por lo que se consideraron estas direcciones:
+
+- `192.168.159.129`, dirección del servidor Zabbix.
+- `172.17.47.225`, dirección de salida considerada en la traducción NAT.
+
+Reinicia el servicio:
 
 ```powershell
-Restart-Service -Name SNMP
+Restart-Service SNMP
 ```
 
-Valide de nuevo desde Linux:
+Vuelve a ejecutar la validación desde CentOS:
 
 ```bash
 snmpwalk -v2c -c zbx_monitor 172.17.47.225 .1.3.6.1.2.1.1
 ```
 
-![Equipo activo en Zabbix](docs/images/09-equipo-activo-zabbix.png)
+La consulta debe continuar respondiendo y Zabbix debe mantener el indicador SNMP en verde.
 
-Si deja de responder, compruebe NAT o virtualización: la dirección de origen observada por Windows puede ser distinta de la IP lógica del servidor Zabbix.
+`netstat` solo confirma que el socket UDP/161 está escuchando; no identifica de forma fiable el origen de las consultas UDP:
 
-## Diagnóstico
+```powershell
+netstat -an | findstr ":161"
+```
+
+Si no se conoce la dirección real de origen, identifica el tráfico con una captura filtrada por `udp.port == 161` o utiliza el registro de autenticación SNMP conforme a la política del entorno.
+
+## 7. Prueba controlada y operación responsable
+
+La implementación de referencia finalizó con los siguientes resultados:
+
+| Prueba | Resultado |
+|---|---|
+| Servicio SNMP de Windows | En ejecución y con inicio automático |
+| Comunidad | `zbx_monitor`, solo lectura |
+| Respuesta `snmpwalk` | Correcta |
+| `sysName` | `DESKTOP-FK5S8HJ` |
+| `sysServices` | `79` |
+| Plantilla | `Windows by SNMP` |
+| Interfaz Zabbix | Verde |
+| Elementos activos | 68 |
+| Restricción por origen | Aplicada y validada |
+
+Para una operación estable:
+
+- Configura una reserva DHCP por dirección MAC o una dirección IP estática.
+- Considera que Wi-Fi puede producir pérdidas de paquetes, suspensiones y cambios de punto de acceso.
+- Ajusta el tiempo de espera SNMP si la red lo requiere.
+- Configura varios fallos consecutivos antes de generar una alerta de indisponibilidad.
+- Define periodos de mantenimiento cuando el equipo se apague fuera del horario operativo.
+- Utiliza conexión cableada cuando sea posible.
+- Revisa periódicamente los elementos en estado **No soportado**.
+- Mantén la comunidad fuera de repositorios y registros compartidos públicamente.
+
+### Solución de problemas
 
 | Síntoma | Causa probable | Acción |
 |---|---|---|
-| `snmpwalk` expira | Servicio detenido, comunidad incorrecta o UDP/161 bloqueado | Revisar servicio, comunidad, firewall y ruta |
-| `sysServices` no es 79 | Faltan servicios en la pestaña Agente | Marcar los cinco servicios y reiniciar SNMP |
-| `snmpwalk` funciona pero Zabbix no | Macro ausente o plantilla equivocada | Definir `{$SNMP_COMMUNITY}` y usar `Windows by SNMP` |
-| El estado queda gris | Interfaz SNMP incorrecta o equipo no disponible | Revisar IP, puerto, versión y conectividad |
-| Funciona con cualquier host pero no restringido | IP de origen alterada por NAT | Autorizar la IP que realmente observa Windows |
+| “La operación solicitada requiere elevación” | PowerShell no se abrió con privilegios elevados. | Abrir PowerShell con **Ejecutar como administrador**. |
+| La instalación parece congelada | Consola en modo de selección de texto. | Pulsar `Esc` o hacer clic derecho; verificar desde una segunda consola. |
+| Solo aparece `SNMPTrap` | La característica `SNMP.Client` no está instalada. | Instalar SNMP y comprobar el servicio `SNMP`. |
+| `snmpwalk` no se reconoce | Se ejecutó en Windows o no se instaló `net-snmp-utils`. | Ejecutarlo en CentOS después de instalar las herramientas. |
+| `snmpwalk` expira | Servicio detenido, comunidad incorrecta o UDP/161 bloqueado. | Revisar servicio, comunidad, firewall y conectividad en ese orden. |
+| No existe el botón “Crear equipo” | Se está en la vista de monitorización. | Ir a **Recopilación de datos → Equipos**. |
+| Zabbix no recibe datos pero `snmpwalk` funciona | Comunidad de la interfaz diferente a la del agente. | Definir `{$SNMP_COMMUNITY}` con `zbx_monitor`. |
+| La consulta falla tras restringir hosts | El tráfico llega desde una dirección traducida por NAT. | Autorizar el origen real o capturar el tráfico UDP/161. |
+| Error `0x800f0954` durante la instalación | WSUS no distribuye la característica opcional. | Usar temporalmente Windows Update o un medio de instalación autorizado. |
 
-## Lista de verificación
+## Seguridad y alcance
 
-- [ ] `net-snmp-utils`/`snmp` instalado en el servidor.
-- [ ] Poller SNMP visible en `zabbix-server`.
-- [ ] Servicio Windows `SNMP` en ejecución y automático.
-- [ ] Comunidad propia y con solo lectura.
-- [ ] Cinco servicios del agente seleccionados.
-- [ ] UDP/161 permitido en entrada.
-- [ ] `snmpwalk` devuelve `sysName` y `sysUpTime`.
-- [ ] Equipo creado con interfaz SNMP y plantilla correcta.
-- [ ] Macro `{$SNMP_COMMUNITY}` definida.
-- [ ] Acceso restringido a la IP real del servidor Zabbix.
+SNMPv2c no cifra la comunidad ni el contenido de las consultas. Las medidas aplicadas reducen la exposición, pero no eliminan el riesgo de captura en tránsito:
+
+1. Se sustituyó la comunidad predeterminada `public`.
+2. Se asignaron permisos de solo lectura.
+3. Se permitió cualquier host únicamente durante la validación inicial.
+4. Se restringió el acceso a orígenes autorizados después de confirmar la funcionalidad.
+5. Se evitó abrir puertos innecesarios en el servidor Zabbix.
+
+El agente SNMP de Windows expone un conjunto reducido de MIBs. La solución es apropiada para métricas básicas de sistema, red, disponibilidad y recursos expuestos por el agente. No sustituye al agente nativo de Zabbix cuando se requiere monitorizar con detalle servicios de Windows, procesos, eventos, rendimiento avanzado de discos o comprobaciones personalizadas.
+
+Microsoft mantiene SNMP como una característica obsoleta y recomienda evaluar tecnologías de administración como CIM/WMI para nuevos diseños [3]. Antes de desplegar esta solución a gran escala, valida la compatibilidad con las futuras versiones de Windows y las políticas de seguridad de la organización.
 
 ## Alcance y privacidad
 
-El monitoreo debe limitarse a métricas técnicas necesarias para el objetivo definido: disponibilidad, identidad del sistema, tiempo activo, interfaces y datos de inventario que la plantilla requiera. No deben recopilarse pulsaciones, contenido de archivos, capturas de pantalla, historial privado ni interpretaciones sobre la conducta de una persona.
+Este procedimiento está limitado a equipos y redes con autorización expresa. El monitoreo debe configurarse con el mínimo privilegio necesario y únicamente para fines de disponibilidad, capacidad, inventario técnico y diagnóstico operativo.
 
-Antes de publicar o compartir este repositorio, revise que no contenga comunidades reales, contraseñas, tokens, claves TLS/PSK, archivos `.env`, logs, nombres internos o direcciones privadas. Si una credencial del material original fue utilizada, debe revocarse y sustituirse.
+No deben incorporarse al repositorio comunidades reales, contraseñas, tokens, capturas con datos personales, direcciones innecesarias ni registros que expongan información sensible. Sustituye los valores del laboratorio por variables o secretos gestionados fuera del repositorio antes de publicar el documento.
 
 ## Referencias
 
-La documentación de la instalación se basa en la configuración de SNMPv2c de Windows y en la plantilla oficial de Zabbix para dispositivos Windows. Consulte las fuentes oficiales antes de adaptar los comandos a otra versión del sistema operativo.
+[1]: https://www.zabbix.com/documentation/current/en/manual/config/items/itemtypes/snmp "Zabbix 7.4 — SNMP agent monitoring"
 
-## Scripts y archivos del repositorio
+[2]: https://www.zabbix.com/documentation/7.4/en/manual/config/templates_out_of_the_box "Zabbix 7.4 — Templates out of the box"
 
-- [`scripts/linux/install-snmp-tools.sh`](scripts/linux/install-snmp-tools.sh): instala herramientas y comprueba el poller.
-- [`scripts/linux/test-snmp.sh`](scripts/linux/test-snmp.sh): ejecuta una prueba parametrizable.
-- [`scripts/windows/install-snmp.ps1`](scripts/windows/install-snmp.ps1): instala e inicia la característica SNMP.
-- [`scripts/windows/configure-snmp-firewall.ps1`](scripts/windows/configure-snmp-firewall.ps1): crea la regla UDP/161.
-- [`config/variables.example.env`](config/variables.example.env): valores de ejemplo, sin secretos reales.
-- [`docs/images/`](docs/images/): páginas visuales extraídas del documento fuente y asociadas a cada segmento.
+[3]: https://learn.microsoft.com/en-us/troubleshoot/windows-client/networking/cannot-install-snmp-wmisnmpprovider "Microsoft Learn — Can't add the SNMP and WMI SNMP Provider features in Windows 10 or Windows 11"
 
-## Licencia
-
-Material de procedimiento preparado para uso interno y adaptación al entorno del repositorio. Revise las políticas de seguridad de su organización antes de utilizar SNMPv2c en producción.
-
-## Fuente visual
-
-La carpeta [`docs/source/`](docs/source/) conserva el PDF de referencia que se utilizó para mantener la distribución, el tono y la correspondencia de imágenes del procedimiento original.
-
+[4]: ./ZABBIX.pdf "Informe de implementación de monitorización SNMP de Windows 11 con Zabbix"
