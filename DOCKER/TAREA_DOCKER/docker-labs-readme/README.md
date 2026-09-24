@@ -111,7 +111,7 @@ Dentro de la carpeta del proyecto se ejecuta `notepad compose.yaml` para inspecc
 Se ejecuta `docker compose up -d`, lo que descarga la imagen `mongo:6` y construye la imagen de la aplicación (`multi-container-app-todo-app`) a partir del Dockerfile de Node.js (basado en `node:19.5.0-alpine`). El log detalla cada etapa del build: carga del Dockerfile, resolución de la imagen base, instalación de dependencias con `npm install`, copia del código fuente y exportación de la imagen final. Al terminar, Docker Compose crea la red `multi-container-app_default` y levanta ambos contenedores (`todo-database-1` y `todo-app-1`), quedando ambos en estado Started.
 
 
-![Captura](./assets/sec2-04.png)
+![Captura](./Capturas/sec2-04.png)
 
 
 *Captura 4 — Aplicación Todo App corriendo en el navegador (localhost:3000)*
@@ -123,7 +123,7 @@ Se abre el navegador en `http://localhost:3000` y se comprueba que la aplicació
 ### 2.3 Recorrido guiado: clonación y despliegue desde el Learning Center
 
 
-![Captura](./assets/sec2-05.png)
+![Captura](./Capturas/sec2-05.png)
 
 
 *Captura 5 — Repositorio docker/multi-container-app en GitHub*
@@ -132,7 +132,7 @@ Se abre el navegador en `http://localhost:3000` y se comprueba que la aplicació
 Se visualiza en GitHub el repositorio oficial `docker/multi-container-app`, que contiene el código fuente de la aplicación de tareas usada en el laboratorio. En su README se indican las instrucciones básicas para probarlo: ejecutar `docker compose up -d` y abrir `http://localhost:3000` en el navegador.
 
 
-![Captura](./assets/sec2-06.png)
+![Captura](./Capturas/sec2-06.png)
 
 
 *Captura 6 — Tutorial "Multi-container applications": clonar el repositorio*
@@ -141,7 +141,7 @@ Se visualiza en GitHub el repositorio oficial `docker/multi-container-app`, que 
 En el Learning Center de Docker Desktop se inicia el tutorial "Multi-container applications". Se completa el primer paso, "Introducing Docker Compose", y se muestra activo el segundo, "Get the sample application", que indica clonar el repositorio desde `https://github.com/docker/multi-container-app` mediante el comando `git clone` proporcionado en el propio panel.
 
 
-![Captura](./assets/sec2-07.png)
+![Captura](./Capturas/sec2-07.png)
 
 
 *Captura 7 — Corrección de un error de ruta y despliegue exitoso con docker compose up -d*
@@ -150,8 +150,7 @@ En el Learning Center de Docker Desktop se inicia el tutorial "Multi-container a
 En un primer intento se ejecuta `docker compose -f C:\ruta\al\docker-compose.yml up -d` usando una ruta de ejemplo no reemplazada, lo que produce un error de PowerShell y de Docker Compose al no encontrar el archivo. La propia terminal sugiere usar el asistente de IA de Docker (Gordon) para depurar el error. A continuación, se clona correctamente el repositorio `multi-container-app`, se accede a la carpeta con `cd` y se ejecuta `docker compose up -d`, que descarga la imagen de MongoDB, construye la imagen de la aplicación y levanta ambos contenedores (`todo-database-1` y `todo-app-1`) en estado Started.
 
 
-![Captura](./assets/sec2-08.png)
-
+![Captura](./Capturas/sec2-08.png)
 
 *Captura 8 — Todo App funcionando en http://localhost:3000*
 
@@ -162,7 +161,7 @@ Se accede a la aplicación en el navegador y se agregan dos tareas de prueba, "a
 ### 2.4 Verificación de contenedores y modo watch
 
 
-![Captura](./assets/sec2-09.png)
+![Captura](./Capturas/sec2-09.png)
 
 
 *Captura 9 — Nueva ejecución de docker compose up -d con los contenedores ya activos*
@@ -171,8 +170,7 @@ Se accede a la aplicación en el navegador y se agregan dos tareas de prueba, "a
 Al finalizar el build anterior y volver a ejecutar `docker compose up -d`, Docker Compose detecta que los contenedores `multi-container-app-todo-database-1` y `multi-container-app-todo-app-1` ya se encuentran en ejecución (Running), por lo que no vuelve a crearlos, solo confirma su estado actual.
 
 
-![Captura](./assets/sec2-10.png)
-
+![Captura](./Capturas/sec2-10.png)
 
 *Captura 10 — Activación del modo docker compose watch*
 
@@ -180,7 +178,7 @@ Al finalizar el build anterior y volver a ejecutar `docker compose up -d`, Docke
 Se ejecuta `docker compose watch`, lo que reconstruye la imagen de la aplicación (18/18 pasos, usando caché en la mayoría de ellos) y deja el mensaje "Watch enabled", habilitando la reconstrucción y sincronización automática del contenedor cada vez que se modifiquen los archivos del proyecto observados por Compose.
 
 
-![Captura](./assets/sec2-11.png)
+![Captura](./Capturas/sec2-11.png)
 
 
 *Captura 11 — Búsqueda del archivo compose.yaml en el sistema*
@@ -198,8 +196,7 @@ Como parte de la depuración del error de ruta ocurrido al iniciar este laborato
 ### 3.1 Inicialización de un proyecto con docker init
 
 
-![Captura](./assets/sec3-01.png)
-
+![Captura](./Capturas/sec3-01.png)
 
 *Captura 1 — Pantalla de bienvenida de la CLI de docker init*
 
@@ -207,8 +204,7 @@ Como parte de la depuración del error de ruta ocurrido al iniciar este laborato
 Se ejecuta el comando `docker init` desde la terminal de PowerShell. El asistente indica que creará cuatro archivos con valores por defecto razonables para el proyecto: `.dockerignore`, `Dockerfile`, `compose.yaml` y `README.Docker.md`. A continuación, pregunta qué plataforma utiliza el proyecto, mostrando un menú con opciones como Go, Python, Node, Rust, ASP.NET Core, PHP with Apache, Java u Other. En este caso se selecciona Python, ya que la aplicación está desarrollada en dicho lenguaje.
 
 
-![Captura](./assets/sec3-02.png)
-
+![Captura](./Capturas/sec3-02.png)
 
 *Captura 2 — Respuestas al asistente y creación de los archivos Docker*
 
@@ -216,7 +212,7 @@ Se ejecuta el comando `docker init` desde la terminal de PowerShell. El asistent
 El asistente solicita la versión de Python (3.14), el puerto en el que escuchará la aplicación (8000) y el comando para ejecutarla. En el primer intento se deja el campo vacío y el asistente lo rechaza ("Value is required"); en el segundo se indica `python app.py`. Con estos datos se confirman los cuatro archivos generados y se muestra el mensaje "Your Docker files are ready!", junto con una advertencia de que no se encontró un archivo `requirements.txt`, recomendando crearlo antes de ejecutar el contenedor. Finalmente se indica el siguiente paso: ejecutar `docker compose up --build` para levantar la aplicación en `http://localhost:8000`.
 
 
-![Captura](./assets/sec3-03.png)
+![Captura](./Capturas/sec3-03.png)
 
 
 *Captura 3 — Proceso de construcción (build) de la imagen con Docker Compose*
@@ -228,7 +224,7 @@ Se ejecuta `docker compose up --build`, que construye la imagen a partir del Doc
 ### 3.2 Construcción manual de una imagen con docker build
 
 
-![Captura](./assets/sec3-04.png)
+![Captura](./Capturas/sec3-04.png)
 
 
 *Captura 4 — Clonación del repositorio y construcción de la imagen con docker build*
@@ -243,7 +239,7 @@ Se clona el repositorio `https://github.com/docker/welcome-to-docker` y, dentro 
 > El recorrido "Persist your data between containers" muestra que, por defecto, los datos generados dentro de un contenedor viven solo mientras ese contenedor existe: si se elimina o se recrea, la información se pierde a menos que se use un mecanismo de persistencia (por ejemplo, un volumen). Las capturas de esta sección documentan tanto la comprobación de que los datos de la Todo App sobreviven al recargar el navegador, como el caso contrario: la pérdida de datos al recrear el contenedor de la base de datos durante el modo watch.
 
 
-![Captura](./assets/sec4-01.png)
+![Captura](./Capturas/sec4-01.png)
 
 
 *Captura 1 — Verificación de persistencia de datos al reabrir la aplicación*
@@ -252,7 +248,7 @@ Se clona el repositorio `https://github.com/docker/welcome-to-docker` y, dentro 
 Al abrir una nueva pestaña y volver a cargar la aplicación, las tres tareas creadas anteriormente siguen apareciendo en la lista, lo que confirma que los datos quedaron almacenados de forma persistente en el contenedor de MongoDB y no se perdieron al recargar la página.
 
 
-![Captura](./assets/sec4-02.png)
+![Captura](./Capturas/sec4-02.png)
 
 
 *Captura 2 — Edición del archivo todos.ejs y actualización en vivo del título*
@@ -261,7 +257,7 @@ Al abrir una nueva pestaña y volver a cargar la aplicación, las tres tareas cr
 Se abre el archivo de plantilla `app/views/todos.ejs` en el editor y se modifica el título de la aplicación, cambiándolo de "Todo App" a "Mi Todo App 🚀". Gracias al modo watch de Docker Compose (activado en la captura siguiente), el cambio se refleja automáticamente en el navegador sin necesidad de reconstruir manualmente el contenedor, y las tareas previamente creadas siguen visibles.
 
 
-![Captura](./assets/sec4-03.png)
+![Captura](./Capturas/sec4-03.png)
 
 
 *Captura 3 — docker compose watch y reinicio de los contenedores*
@@ -276,7 +272,7 @@ Se ejecuta `docker compose watch`, que reconstruye la imagen (Building 16/16 FIN
 > El recorrido "Access your local folder from a container" enseña a usar bind mounts para conectar una carpeta del equipo local directamente con una carpeta dentro del contenedor, de modo que los cambios hechos en el editor de código se reflejen de inmediato dentro de la aplicación en ejecución, sin necesidad de reconstruir ni reiniciar el contenedor. Esta sección documenta la práctica de esta técnica con el proyecto de ejemplo bindmount-apps.
 
 
-![Captura](./assets/sec5-01.png)
+![Captura](./Capturas/sec5-01.png)
 
 
 *Captura 1 — Clonación del repositorio bindmount-apps*
@@ -285,7 +281,7 @@ Se ejecuta `docker compose watch`, que reconstruye la imagen (Building 16/16 FIN
 Se clona un nuevo repositorio, `https://github.com/docker/bindmount-apps`, orientado a practicar el uso de bind mounts. Tras acceder a la carpeta con `cd bindmount-apps`, se lista su contenido con `dir`, encontrando los archivos `.gitignore`, `.npmrc`, `compose.yaml`, `README.md` y la carpeta `app`, que contiene el código fuente de la aplicación.
 
 
-![Captura](./assets/sec5-02.png)
+![Captura](./Capturas/sec5-02.png)
 
 
 *Captura 2 — Levantamiento de los contenedores con docker compose up -d*
@@ -294,7 +290,7 @@ Se clona un nuevo repositorio, `https://github.com/docker/bindmount-apps`, orien
 Se ejecuta `docker compose up -d` dentro del proyecto `bindmount-apps`, levantando correctamente los dos contenedores definidos: `bindmount-apps-todo-app-1` y `bindmount-apps-todo-database-1`, ambos en estado Started.
 
 
-![Captura](./assets/sec5-03.png)
+![Captura](./Capturas/sec5-03.png)
 
 
 *Captura 3 — Edición en vivo del archivo todos.ejs gracias al bind mount*
@@ -309,7 +305,7 @@ Se edita el archivo `todos.ejs`, cambiando el texto del formulario a "Holiiii:)"
 > El recorrido "Run Docker Hub images" muestra cómo aprovechar Docker Hub, el registro público de imágenes de Docker, para descargar (pull) y ejecutar imágenes ya construidas por otros, sin necesidad de escribir un Dockerfile propio. Esta sección documenta la descarga de la imagen de ejemplo `docker/welcome-to-docker` que se usa como base en varios de los laboratorios anteriores.
 
 
-![Captura](./assets/sec6-01.png)
+![Captura](./Capturas/sec6-01.png)
 
 
 *Captura 1 — Descarga de la imagen welcome-to-docker y listado de imágenes locales*
@@ -324,7 +320,7 @@ Se descarga la imagen `docker/welcome-to-docker` con `docker pull` y, posteriorm
 > El recorrido "Publish your image" enseña a compartir una imagen propia en Docker Hub para que pueda ser descargada y ejecutada por otras personas o en otros equipos. El proceso consiste en renombrar (tag) la imagen local con el nombre de usuario de Docker Hub y luego subirla (push) al repositorio personal. Esta sección documenta la publicación de la imagen construida en la Sección 3 en la cuenta personal de Docker Hub.
 
 
-![Captura](./assets/sec7-01.png)
+![Captura](./Capturas/sec7-01.png)
 
 
 *Captura 1 — Publicación (push) de la imagen en el Docker Hub personal*
