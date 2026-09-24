@@ -16,7 +16,7 @@ _Este documento recopila y describe, captura por captura, todo el trabajo práct
 ### 1.1 Primer contenedor y exploración con Docker Desktop
 
 
-![Captura](./sec1-01.png)
+![Captura](./Capturas/sec1-01.png)
 
 
 *Captura 1 — Primer contenedor ejecutado correctamente (localhost:8088)*
@@ -25,7 +25,7 @@ _Este documento recopila y describe, captura por captura, todo el trabajo práct
 Al ejecutar el contenedor de ejemplo `docker/welcome-to-docker` y acceder a `http://localhost:8088`, se muestra la página de felicitaciones "Congratulations!!! You ran your first container.", confirmando que el primer contenedor del laboratorio se ejecutó exitosamente.
 
 
-![Captura](./assets/sec1-02.png)
+![Captura](./Capturas/sec1-02.png)
 
 
 *Captura 2 — Panel de contenedores en Docker Desktop y tutorial "What is a container?"*
