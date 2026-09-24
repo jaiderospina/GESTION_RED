@@ -34,8 +34,7 @@ Al ejecutar el contenedor de ejemplo `docker/welcome-to-docker` y acceder a `htt
 En la sección Containers de Docker Desktop se listan los contenedores creados hasta el momento: `competent_davinci` (hello-world), `sweet_swirles` (ubuntu) y `welcome-to-docker`, este último expuesto en el puerto 8088. En el panel lateral del Learning Center, dentro del tutorial "What is a container?", se han completado los pasos "Containers on Docker Desktop" y "View the frontend", y se encuentra activo el paso 3, "Explore your container", que invita a seleccionar el contenedor y revisar su pestaña Files.
 
 
-![Captura](./assets/sec1-03.png)
-
+![Captura](./Capturas/sec1-03.png)
 
 *Captura 3 — Contenedor detenido (Exited) y paso "Stop your container"*
 
@@ -46,7 +45,7 @@ Se muestra el contenedor `thirsty_merkle` (basado en la imagen `docker/welcome-t
 ### 1.2 Ejecución de una imagen propia
 
 
-![Captura](./assets/sec1-04.png)
+![Captura](./Capturas/sec1-04.png)
 
 
 *Captura 4 — Tutorial "How do I run a container?": ejecutar el contenedor propio*
@@ -55,7 +54,7 @@ Se muestra el contenedor `thirsty_merkle` (basado en la imagen `docker/welcome-t
 En un tutorial distinto del Learning Center, "How do I run a container?", ya completados los pasos de verificar el Dockerfile y construir la primera imagen, se encuentra activo el paso 5, "Run your container". El panel explica que, una vez finalizada la construcción, la imagen aparece en la pestaña Images, desde donde se selecciona y se ejecuta como contenedor indicando un puerto (en este caso, 8089). Como resultado se observa el contenedor `objective_gagarin`, creado a partir de la imagen `welcome-to-docker:latest`, corriendo y mapeado en el puerto 8089:3000.
 
 
-![Captura](./assets/sec1-05.png)
+![Captura](./Capturas/sec1-05.png)
 
 
 *Captura 5 — Paso "View the frontend": acceso al contenedor en ejecución*
@@ -64,7 +63,7 @@ En un tutorial distinto del Learning Center, "How do I run a container?", ya com
 Con el contenedor `objective_gagarin` en ejecución, el tutorial avanza al paso 6, "View the frontend", que indica cómo acceder a la aplicación en vivo haciendo clic sobre el nombre del contenedor o su puerto publicado. Se muestra el contenedor `musing_pasteur`, expuesto también en el puerto 8089:3000, junto con sus logs, confirmando que el servidor está aceptando conexiones.
 
 
-![Captura](./assets/sec1-06.png)
+![Captura](./Capturas/sec1-06.png)
 
 
 *Captura 6 — Página de felicitaciones servida desde la imagen propia (localhost:8089)*
@@ -82,7 +81,7 @@ Al abrir `http://localhost:8089` en el navegador se vuelve a mostrar la página 
 ### 2.1 Clonación y exploración del proyecto
 
 
-![Captura](./assets/sec2-01.png)
+![Captura](./Capturas/sec2-01.png)
 
 
 *Captura 1 — Clonación del repositorio multi-container-app*
@@ -91,7 +90,7 @@ Al abrir `http://localhost:8089` en el navegador se vuelve a mostrar la página 
 Se clona el repositorio oficial `https://github.com/docker/multi-container-app` dentro de la carpeta personal del usuario (`$HOME`). El log confirma la recepción de los 2318 objetos del repositorio. Después, con el comando `dir` se listan las carpetas y archivos del usuario, comprobando que la carpeta `multi-container-app` ya se encuentra creada, y se accede a ella con `cd`.
 
 
-![Captura](./assets/sec2-02.png)
+![Captura](./Capturas/sec2-02.png)
 
 
 *Captura 2 — Archivo de configuración (compose.yaml) abierto en el Bloc de notas*
@@ -103,7 +102,7 @@ Dentro de la carpeta del proyecto se ejecuta `notepad compose.yaml` para inspecc
 ### 2.2 Levantamiento de contenedores y prueba de la aplicación
 
 
-![Captura](./assets/sec2-03.png)
+![Captura](./Capturas/sec2-03.png)
 
 
 *Captura 3 — Ejecución de docker compose up -d*
