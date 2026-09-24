@@ -16,7 +16,7 @@ _Este documento recopila y describe, captura por captura, todo el trabajo práct
 ### 1.1 Primer contenedor y exploración con Docker Desktop
 
 
-![Captura](./assets/sec1-01.png)
+![Captura](./sec1-01.png)
 
 
 *Captura 1 — Primer contenedor ejecutado correctamente (localhost:8088)*
