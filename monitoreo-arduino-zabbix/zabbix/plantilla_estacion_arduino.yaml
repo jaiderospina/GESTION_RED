@@ -1,0 +1,207 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: a9b2fbe4836e4834a1d625687fb9e986
+      name: Templates/IoT
+  templates:
+    - uuid: 9fd21e149c2e44a9a15812ca4849a1ba
+      template: 'Estacion Arduino Zabbix'
+      name: 'Estacion Arduino Zabbix'
+      description: 'Arduino UNO con PIR, vibracion, sonido y BH1750. Sirve para el modo USB y el modo Ethernet.'
+      groups:
+        - name: Templates/IoT
+      items:
+        - uuid: 1add674a172648478f81fa9a27acce19
+          name: 'Estacion: tiempo encendido'
+          key: sensor.uptime
+          delay: 1m
+          history: 7d
+          value_type: UNSIGNED
+          units: 'uptime'
+          description: 'Segundos desde que se encendio el Arduino.'
+          tags:
+            - tag: componente
+              value: estacion
+          triggers:
+            - uuid: 7576b5ea1ccc4e3b9a158a7b5265db9e
+              expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+              name: 'Estacion sin datos por {$SIN.DATOS}'
+              priority: HIGH
+              description: 'No llegan datos del Arduino. Revisa alimentacion, cable USB o de red.'
+            - uuid: 53d7c4594490409ca67d00ea8e9cc229
+              expression: 'last(/Estacion Arduino Zabbix/sensor.uptime)<300'
+              name: 'Estacion reiniciada'
+              priority: INFO
+              description: 'El Arduino se encendio hace menos de 5 minutos.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+        - uuid: 13175de5fdde4381ae74761d7961cb66
+          name: 'Ambiente: luz'
+          key: sensor.luz
+          delay: 1m
+          history: 30d
+          value_type: FLOAT
+          units: 'lx'
+          description: 'Luz medida por el BH1750.'
+          tags:
+            - tag: componente
+              value: ambiente
+          triggers:
+            - uuid: a1b10302241c453b8e59589c0b6466d0
+              expression: 'max(/Estacion Arduino Zabbix/sensor.luz,#3)<{$LUZ.BAJA}'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'min(/Estacion Arduino Zabbix/sensor.luz,#3)>={$LUZ.BAJA}+{$LUZ.MARGEN}'
+              name: 'Baja luminosidad (menor a {$LUZ.BAJA} lx)'
+              priority: WARNING
+              description: 'Tres lecturas seguidas bajo el umbral.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+            - uuid: 83b7af88c4634f4e8d2f7cde34c4d85a
+              expression: 'abs(change(/Estacion Arduino Zabbix/sensor.luz))>{$LUZ.CAMBIO}'
+              name: 'Cambio brusco de luz (mas de {$LUZ.CAMBIO} lx)'
+              priority: WARNING
+              description: 'La luz cambio mas que el umbral entre dos lecturas: se encendio o apago una luz.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+        - uuid: fa36fe13af29423d9f45e808a89d00c4
+          name: 'Seguridad: movimiento'
+          key: sensor.movimiento
+          delay: 1m
+          history: 30d
+          value_type: UNSIGNED
+          description: '1 si el PIR detecto movimiento en los ultimos 60 s.'
+          valuemap:
+            name: Deteccion
+          tags:
+            - tag: componente
+              value: seguridad
+          triggers:
+            - uuid: 474432b95c0c4741a05622e19c743fff
+              expression: 'last(/Estacion Arduino Zabbix/sensor.movimiento)=1'
+              name: 'Movimiento detectado'
+              priority: WARNING
+              description: 'El PIR detecto movimiento en el ultimo minuto.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+        - uuid: d1e6c81dea5f4d8ebeb2ff747b9f5570
+          name: 'Seguridad: vibracion'
+          key: sensor.vibracion
+          delay: 1m
+          history: 30d
+          value_type: UNSIGNED
+          description: '1 si hubo vibracion en los ultimos 60 s.'
+          valuemap:
+            name: Deteccion
+          tags:
+            - tag: componente
+              value: seguridad
+          triggers:
+            - uuid: db6f3139335e457dbc3c71efacb535c5
+              expression: 'last(/Estacion Arduino Zabbix/sensor.vibracion)=1'
+              name: 'Vibracion detectada'
+              priority: AVERAGE
+              description: 'El sensor SW-18015P detecto golpes o vibracion.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+        - uuid: 72cacfe342b84acba86f3aed5e18961e
+          name: 'Seguridad: vibraciones por minuto'
+          key: sensor.vibraciones
+          delay: 1m
+          history: 30d
+          value_type: FLOAT
+          description: 'Cambios de la salida del sensor de vibracion entre dos lecturas.'
+          preprocessing:
+            - type: SIMPLE_CHANGE
+              parameters:
+                - ''
+          tags:
+            - tag: componente
+              value: seguridad
+        - uuid: 114bc0f351a94c8c8a3c364cf9a7e821
+          name: 'Ambiente: ruido'
+          key: sensor.ruido
+          delay: 1m
+          history: 30d
+          value_type: UNSIGNED
+          description: 'Pico de ruido de los ultimos 30 a 60 s, de 0 a 1023.'
+          tags:
+            - tag: componente
+              value: ambiente
+          triggers:
+            - uuid: e85a2005b5334a64b4c4d3a1c84a8b9a
+              expression: 'last(/Estacion Arduino Zabbix/sensor.ruido)>{$RUIDO.ALTO}'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Estacion Arduino Zabbix/sensor.ruido)<{$RUIDO.ALTO}-{$RUIDO.MARGEN}'
+              name: 'Ruido alto (mayor a {$RUIDO.ALTO})'
+              priority: AVERAGE
+              description: 'El pico de ruido supera el umbral.'
+              dependencies:
+                - name: 'Estacion sin datos por {$SIN.DATOS}'
+                  expression: 'nodata(/Estacion Arduino Zabbix/sensor.uptime,{$SIN.DATOS})=1'
+      macros:
+        - macro: '{$LUZ.BAJA}'
+          value: '5'
+          description: 'Umbral bajo de luz en lux'
+        - macro: '{$LUZ.MARGEN}'
+          value: '5'
+          description: 'Histeresis de luz en lux'
+        - macro: '{$LUZ.CAMBIO}'
+          value: '30'
+          description: 'Cambio de luz entre dos lecturas que genera alerta, en lux'
+        - macro: '{$RUIDO.ALTO}'
+          value: '80'
+          description: 'Umbral alto de ruido, de 0 a 1023'
+        - macro: '{$RUIDO.MARGEN}'
+          value: '20'
+          description: 'Histeresis de ruido'
+        - macro: '{$SIN.DATOS}'
+          value: '3m'
+          description: 'Tiempo sin datos antes de alertar'
+      valuemaps:
+        - uuid: 859ef3bdbac74500bf7d7c6904fab098
+          name: Deteccion
+          mappings:
+            - value: '0'
+              newvalue: 'No'
+            - value: '1'
+              newvalue: Detectado
+  graphs:
+    - uuid: 99dab3788a214d08bbb34c41e8ca205b
+      name: 'Luz'
+      graph_items:
+            - color: E8A317
+              item:
+                host: 'Estacion Arduino Zabbix'
+                key: sensor.luz
+    - uuid: db46f439b5b04b9a945ab85b038383be
+      name: 'Ruido y vibraciones'
+      graph_items:
+            - color: 0080FF
+              item:
+                host: 'Estacion Arduino Zabbix'
+                key: sensor.ruido
+            - sortorder: '1'
+              color: E45959
+              yaxisside: RIGHT
+              item:
+                host: 'Estacion Arduino Zabbix'
+                key: sensor.vibraciones
+    - uuid: 1864f69444954184938c509f14ac5cc6
+      name: 'Movimiento y vibracion'
+      graph_items:
+            - color: E45959
+              drawtype: FILLED_REGION
+              item:
+                host: 'Estacion Arduino Zabbix'
+                key: sensor.movimiento
+            - sortorder: '1'
+              color: E8A317
+              drawtype: BOLD_LINE
+              item:
+                host: 'Estacion Arduino Zabbix'
+                key: sensor.vibracion

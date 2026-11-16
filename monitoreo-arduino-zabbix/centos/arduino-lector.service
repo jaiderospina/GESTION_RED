@@ -1,0 +1,11 @@
+[Unit]
+Description=Lector USB de la estacion Arduino para Zabbix
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/arduino-lector.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
